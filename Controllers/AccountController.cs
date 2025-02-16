@@ -123,26 +123,27 @@ namespace MoviesMafia.Controllers
             ViewBag.ProfilePicturePath = User.Identity.Name + extension;
 
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            var list = _recordsRepo.GetRecordsByUserId(userId);
+            var list = await _recordsRepo.GetRecordsByUserIdAsync(userId);
             var tuple = new Tuple<List<Records>, UpdateUserModel>(list, new UpdateUserModel());
 
             return View(tuple);
         }
 
         [Authorize]
-        public IActionResult DeleteRecord(string deleteButton)
+        public async Task<IActionResult> DeleteRecord(string deleteButton)
         {
-            ViewBag.EmailData = _userRepo.GetUserEmailAsync(User.Identity.Name);
+            ViewBag.EmailData = await _userRepo.GetUserEmailAsync(User.Identity.Name);
             Records del = System.Text.Json.JsonSerializer.Deserialize<Records>(deleteButton);
 
             _recordsRepo.Delete(del);
+            await _recordsRepo.SaveChangesAsync();
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            var list = _recordsRepo.GetRecordsByUserId(userId);
+            var list = await _recordsRepo.GetRecordsByUserIdAsync(userId);
             return RedirectToAction("Profile", list);
         }
 
         [Authorize]
-        public IActionResult RequestMovie(string name, int year, string type)
+        public async Task<IActionResult> RequestMovie(string name, int year, string type)
         {
             object data = string.Empty;
             string cookieNameMovie = "movie_name_" + HttpContext.User.Identity.Name;
@@ -156,6 +157,7 @@ namespace MoviesMafia.Controllers
                 {
 
                     _recordsRepo.Add(new Records { Name = name, UserId = User.FindFirstValue(ClaimTypes.NameIdentifier), Year = year, Type = type });
+                    await _recordsRepo.SaveChangesAsync();
                     data = "Your Requested Movie " + name + " Has Been Received";
                     HttpContext.Response.Cookies.Append(cookieNameMovie, name, new CookieOptions { Expires = DateTime.Now.AddDays(1) });
                 }
@@ -169,7 +171,7 @@ namespace MoviesMafia.Controllers
 
         [Authorize]
         [HttpPost]
-        public IActionResult EditRecord(int id, string name, int year, string type)
+        public async Task<IActionResult> EditRecord(int id, string name, int year, string type)
         {
             if (ModelState.IsValid)
             {
@@ -177,6 +179,7 @@ namespace MoviesMafia.Controllers
                 Records r = _recordsRepo.GetById(id);
                 r.Name = name; r.Year = year; r.Type = type; r.UserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
                 _recordsRepo.Update(r);
+                await _recordsRepo.SaveChangesAsync();
             }
             return RedirectToAction("Profile");
         }
@@ -193,8 +196,8 @@ namespace MoviesMafia.Controllers
 
             if (ModelState.IsValid)
             {
-                var user = _userRepo.GetUserAsync(User);
-                var updateResult = await _userRepo.UpdatePasswordAsync(user.Result, model.CurrentPassword, model.NewPassword);
+                var user = await _userRepo.GetUserAsync(User);
+                var updateResult = await _userRepo.UpdatePasswordAsync(user, model.CurrentPassword, model.NewPassword);
                 if (updateResult.Succeeded)
                 {
                     return "Password Updated Successfully";
@@ -216,9 +219,9 @@ namespace MoviesMafia.Controllers
         }
         [HttpGet]
         [Authorize(Roles = "Admin")]
-        public IActionResult Admin()
+        public async Task<IActionResult> Admin()
         {
-            var allUsers = _userRepo.GetAllUsersAsync();
+            var allUsers = await _userRepo.GetAllUsersAsync();
             return View(allUsers);
         }
         [Authorize(Roles = "Admin")]

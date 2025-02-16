@@ -4,6 +4,6 @@ namespace MoviesMafia.Models.Repo
 {
     public interface IRecordsRepo : IGenericRepo<Records>
     {
-        List<Records> GetRecordsByUserId(string userId);
+        Task<List<Records>> GetRecordsByUserIdAsync(string userId);
     }
 }

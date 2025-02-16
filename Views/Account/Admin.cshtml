@@ -1,10 +1,10 @@
-﻿@model Task<IList<AppUser>>
+﻿@model IList<AppUser>
 @using MoviesMafia.Models.Repo
 @using MoviesMafia.Models.GenericRepo
 @using System.Text.Json;
 @using System.Security.Claims;
 
-@section profilecss{
+@section profilecss {
     <link rel="stylesheet" href="~/css/profile.css" asp-append-version="true" />
 }
 @{
@@ -22,7 +22,7 @@
             </tr>
         </thead>
         <tbody>
-            @foreach (var v in Model.Result)
+            @foreach (var v in Model)
             {
                 <tr class="text-break">
                     <th scope="row">@v.Id</th>

@@ -1,4 +1,5 @@
-﻿using MoviesMafia.Models.GenericRepo;
+﻿using Microsoft.EntityFrameworkCore;
+using MoviesMafia.Models.GenericRepo;
 
 namespace MoviesMafia.Models.Repo
 {
@@ -11,9 +12,9 @@ namespace MoviesMafia.Models.Repo
             _context = context;
         }
 
-        public List<Records> GetRecordsByUserId(string userId)
+        public async Task<List<Records>> GetRecordsByUserIdAsync(string userId)
         {
-            List<Records> listRecords = _context.Records.Where(x => x.UserId == userId).Select(e => new Records { Id = e.Id, Name = e.Name, Year = e.Year, Type = e.Type }).ToList();
+            List<Records> listRecords = await _context.Records.Where(x => x.UserId == userId).Select(e => new Records { Id = e.Id, Name = e.Name, Year = e.Year, Type = e.Type }).ToListAsync();
             return listRecords;
         }
     }

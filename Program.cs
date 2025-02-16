@@ -10,7 +10,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.SetupAppSettings();
 
 var connectionString = AppSettings.ConnectionStrings.DefaultConnection;
-var adminDetails = AppSettings.AdminDetails;
+var adminDetails = AppSettings.AdminDetails; 
 
 // Add services to the container.
 
