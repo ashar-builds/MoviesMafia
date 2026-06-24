@@ -37,41 +37,68 @@ Interactivity is split deliberately:
 
 ## Prerequisites
 
-- .NET 10 SDK
-- PostgreSQL (local or remote)
-- Tailwind CSS v4 standalone CLI on your `PATH` as `tw` (or pass `-p:TailwindCli=/path/to/tailwindcss`)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download)
+- [PostgreSQL](https://www.postgresql.org/download/) (local or remote)
+- [A free TMDB API key](https://www.themoviedb.org/settings/api)
+- Tailwind CSS v4 [standalone CLI](https://github.com/tailwindlabs/tailwindcss/releases) on your `PATH` as `tw` (or pass `-p:TailwindCli=/path/to/tailwindcss`). No Node.js required.
 
-## Configuration
+## Quick start (clone & run)
 
-Non-secret defaults live in `appsettings.json`. Provide secrets via **user-secrets** (dev) or environment
-variables (prod). Required keys:
+No secrets are committed to this repo, so after cloning you supply your own via
+[**user-secrets**](https://learn.microsoft.com/aspnet/core/security/app-secrets) (they live
+outside the repo and load automatically in Development). The committed `appsettings.json` holds
+only non-secret defaults.
 
 ```bash
-dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Port=5432;Database=movies-mafia;Username=postgres;Password=..."
+# 1. Clone and enter the repo
+git clone https://github.com/<you>/MoviesMafia.git
+cd MoviesMafia
+
+# 2. Create the database (any PostgreSQL instance works; adjust the name/credentials to taste)
+createdb movies-mafia        # or: psql -U postgres -c "CREATE DATABASE \"movies-mafia\";"
+
+# 3. Provide the two required secrets
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Port=5432;Database=movies-mafia;Username=postgres;Password=postgres"
 dotnet user-secrets set "Tmdb:ApiKey" "<your-tmdb-api-key>"
-dotnet user-secrets set "Streaming:AutoEmbedUrl" "https://<embed-provider>/embed"
+
+# 4. (Optional but recommended) seed an admin account so you can reach /admin
 dotnet user-secrets set "AdminSeed:UserName" "admin"
 dotnet user-secrets set "AdminSeed:Email" "admin@example.com"
 dotnet user-secrets set "AdminSeed:Password" "<strong-password>"
-# SMTP (production email confirmation):
-dotnet user-secrets set "Smtp:Host" "..."  # Port/UserName/Password/FromAddress
-```
 
-In **Development**, new accounts are auto-confirmed (no SMTP needed) and the bundled
-`appsettings.Development.json` has working local defaults.
+# 5. (Optional) playback provider for the Watch page
+dotnet user-secrets set "Streaming:AutoEmbedUrl" "https://<embed-provider>"
 
-## Running
-
-```bash
-# 1. Compile Tailwind once (or use --watch in a second terminal during development)
-tw -i Styles/app.tailwind.css -o wwwroot/app.css --watch
-
-# 2. Run the app (the build also compiles Tailwind via an MSBuild target)
+# 6. Run — the build compiles Tailwind, then EF migrations + role/admin seeding run on first start
 dotnet run
 ```
 
-The app applies EF migrations and seeds roles + the admin account on first start.
-It listens on https://localhost:5248 by default (see `Properties/launchSettings.json`).
+Then open **https://localhost:5248** (see `Properties/launchSettings.json`).
+
+> **In Development, new accounts are auto-confirmed** — no SMTP needed to register and sign in.
+> SMTP (`Smtp:Host`, `Smtp:UserName`, `Smtp:Password`, …) is only required in production, where
+> email confirmation is enforced. Set those secrets too if you want to test the email flow locally.
+
+### Tailwind during development
+
+The build compiles `Styles/app.tailwind.css → wwwroot/app.css` via an MSBuild target, so a plain
+`dotnet run` is enough. For live CSS updates while editing, run the watcher in a second terminal:
+
+```bash
+tw -i Styles/app.tailwind.css -o wwwroot/app.css --watch
+```
+
+### Full list of configuration keys
+
+| Key | Required (dev) | Default |
+|---|---|---|
+| `ConnectionStrings:DefaultConnection` | **yes** | — |
+| `Tmdb:ApiKey` | **yes** | — (validated on startup) |
+| `AdminSeed:UserName` / `:Email` / `:Password` | recommended | empty → no admin seeded |
+| `Streaming:AutoEmbedUrl` | optional | empty |
+| `Smtp:Host` / `:Port` / `:UserName` / `:Password` / `:FromAddress` / `:FromName` / `:EnableSsl` | prod only | `587` / `no-reply@moviesmafia.local` / `MoviesMafia` / `true` |
+| `Tmdb:BaseUrl` / `:ImageBaseUrl` | no | public TMDB URLs |
+| `Storage:AvatarsPath` / `:AvatarsRequestPath` | no | `App_Data/avatars` / `/avatars` |
 
 ### Database migrations
 
@@ -93,3 +120,42 @@ dotnet dotnet-ef migrations add <Name> --output-dir Data/Migrations
 
 The provided `Dockerfile` (multi-stage, .NET 10) downloads the Tailwind CLI during the build so
 `wwwroot/app.css` is generated at publish time. Supply secrets as environment variables at runtime.
+
+## Deployment (GitHub Actions → MonsterASP)
+
+`.github/workflows/deploy.yml` builds, publishes, and deploys over SFTP to MonsterASP on every push
+to `master` (or via **Run workflow**). It writes secrets into `appsettings.Production.json` at deploy
+time — nothing sensitive is committed. Configure these under **Settings → Secrets and variables →
+Actions** in your GitHub repo:
+
+**Required** (the workflow fails fast, listing any that are missing):
+
+| Secret | Purpose |
+|---|---|
+| `MONSTERASP_FTP_SERVER` | SFTP host |
+| `MONSTERASP_FTP_USERNAME` | SFTP username |
+| `MONSTERASP_FTP_PASSWORD` | SFTP password |
+| `DEFAULT_CONNECTION_STRING` | Production PostgreSQL connection string |
+| `TMDB_API_KEY` | TMDB API key (app won't start without it) |
+| `ADMIN_USERNAME` | Seeded admin username |
+| `ADMIN_EMAIL` | Seeded admin email |
+| `ADMIN_PASSWORD` | Seeded admin password |
+| `SMTP_HOST` | SMTP server (prod enforces email confirmation) |
+| `SMTP_USERNAME` | SMTP username |
+| `SMTP_PASSWORD` | SMTP password |
+
+**Optional** (fall back to `appsettings.json` defaults if unset):
+
+| Secret | Default |
+|---|---|
+| `MONSTERASP_FTP_SERVER_DIR` | `/wwwroot` |
+| `STREAMING_AUTOEMBED_URL` | empty |
+| `SMTP_PORT` | `587` |
+| `SMTP_FROM_ADDRESS` | `no-reply@moviesmafia.local` |
+| `SMTP_FROM_NAME` | `MoviesMafia` |
+| `SMTP_ENABLE_SSL` | `true` |
+| `ADMIN_PROFILE_PICTURE` | empty |
+
+> **Note:** MonsterASP must reach a PostgreSQL instance (this app uses Npgsql, not SQL Server).
+> For multi-instance hosting, persist Data Protection keys (see Production notes) so encrypted
+> ReactiveBlazor state survives restarts.

@@ -34,7 +34,12 @@
 		<TailwindOutput>$(MSBuildProjectDirectory)/wwwroot/app.css</TailwindOutput>
 	</PropertyGroup>
 
+	<!-- CI builds the CSS with the npm Tailwind CLI and publishes with
+	     -p:SkipTailwindBuild=true to bypass this target (the standalone "tw"
+	     binary isn't on the runner, and git-checkout timestamps make the
+	     incremental Inputs/Outputs check unreliable). -->
 	<Target Name="BuildTailwind" BeforeTargets="Build;Publish"
+			Condition="'$(SkipTailwindBuild)' != 'true'"
 			Inputs="$(TailwindInput);@(Compile);@(Content)"
 			Outputs="$(TailwindOutput)">
 		<Message Importance="high" Text="Building Tailwind CSS into $(TailwindOutput)" />
