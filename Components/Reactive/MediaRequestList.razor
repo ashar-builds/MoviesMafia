@@ -21,11 +21,11 @@
                 @foreach (var r in _items)
                 {
                     <li class="flex items-center justify-between gap-3 py-3">
-                        <div>
-                            <p class="text-sm font-medium">@r.Name @(r.Year > 0 ? $"({r.Year})" : "")</p>
+                        <div class="min-w-0">
+                            <p class="truncate text-sm font-medium">@r.Name @(r.Year > 0 ? $"({r.Year})" : "")</p>
                             <p class="text-xs text-on-surface-variant">@r.Type · requested @r.CreatedAt.ToString("MMM d, yyyy")</p>
                         </div>
-                        <button type="button" class="btn-subtle text-primary"
+                        <button type="button" class="btn-subtle shrink-0 text-primary"
                                 data-on-click="Delete" data-args="[@r.Id]">Remove</button>
                     </li>
                 }

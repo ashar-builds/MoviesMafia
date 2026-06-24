@@ -1,4 +1,5 @@
-@* Presentational poster card. Trailer/Watch buttons appear on hover. *@
+@* Presentational poster card. On desktop the Trailer/Watch overlay reveals on
+   hover; on touch devices (no hover) it stays visible so the actions are reachable. *@
 
 <div class="group card overflow-hidden">
     <div class="relative aspect-[2/3] overflow-hidden bg-surface-2">
@@ -21,15 +22,16 @@
             <span class="chip absolute left-2 top-2 bg-ink/70 backdrop-blur">@Badge</span>
         }
 
-        @* Hover overlay: gradient + overview + action buttons. *@
-        <div class="absolute inset-0 flex flex-col justify-end gap-3 bg-gradient-to-t from-ink via-ink/80 to-transparent p-3 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+        @* Overlay: gradient + overview + action buttons. Visible by default (touch),
+           hover-reveal from sm: up where a pointer exists. *@
+        <div class="absolute inset-0 flex flex-col justify-end gap-3 bg-gradient-to-t from-ink via-ink/80 to-transparent p-3 opacity-100 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100">
             @if (!string.IsNullOrWhiteSpace(Overview))
             {
-                <p class="line-clamp-4 text-xs text-content/90">@Overview</p>
+                <p class="hidden line-clamp-4 text-xs text-content/90 sm:block">@Overview</p>
             }
             <div class="flex gap-2">
-                <a href="@TrailerUrl" class="btn-ghost flex-1 px-2 py-1.5 text-xs">Trailer</a>
-                <a href="@WatchUrl" class="btn-primary flex-1 px-2 py-1.5 text-xs">▶ Watch</a>
+                <a href="@TrailerUrl" class="btn-ghost flex-1 px-2 py-2 text-xs sm:py-1.5">Trailer</a>
+                <a href="@WatchUrl" class="btn-primary flex-1 px-2 py-2 text-xs sm:py-1.5">▶ Watch</a>
             </div>
         </div>
     </div>

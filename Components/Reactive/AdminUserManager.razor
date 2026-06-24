@@ -32,7 +32,7 @@
                             <td class="px-4 py-3">
                                 <div class="flex items-center gap-3">
                                     <img src="@Avatars.PublicPath(u.ProfilePictureFileName)" alt=""
-                                         class="h-8 w-8 rounded-full border border-white/10 object-cover" />
+                                         class="h-8 w-8 shrink-0 rounded-full border border-white/10 object-cover" />
                                     <span class="font-medium">@u.UserName</span>
                                 </div>
                             </td>
@@ -50,16 +50,16 @@
                                 <div class="flex justify-end gap-2">
                                     @if (EditingId == u.Id)
                                     {
-                                        <button type="button" class="btn-primary px-3 py-1.5 text-xs"
+                                        <button type="button" class="btn-primary px-3 py-2 text-xs"
                                                 data-on-click="SaveEmail" data-args="@IdArgs(u.Id)">Save</button>
-                                        <button type="button" class="btn-subtle px-3 py-1.5 text-xs"
+                                        <button type="button" class="btn-subtle px-3 py-2 text-xs"
                                                 data-on-click="CancelEdit">Cancel</button>
                                     }
                                     else
                                     {
-                                        <button type="button" class="btn-ghost px-3 py-1.5 text-xs"
+                                        <button type="button" class="btn-ghost px-3 py-2 text-xs"
                                                 data-on-click="BeginEdit" data-args="@IdArgs(u.Id)">Edit</button>
-                                        <button type="button" class="btn-subtle px-3 py-1.5 text-xs text-primary"
+                                        <button type="button" class="btn-subtle px-3 py-2 text-xs text-primary"
                                                 data-on-click="DeleteUser" data-args="@IdArgs(u.Id)">Delete</button>
                                     }
                                 </div>

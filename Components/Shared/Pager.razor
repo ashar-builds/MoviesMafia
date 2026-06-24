@@ -2,7 +2,7 @@
 
 @if (TotalPages > 1)
 {
-    <nav class="mt-8 flex items-center justify-center gap-3" aria-label="Pagination">
+    <nav class="mt-8 flex flex-wrap items-center justify-center gap-2 sm:gap-3" aria-label="Pagination">
         @if (Page > 1)
         {
             <a class="btn-ghost" href="@PageHref(Page - 1)">← Previous</a>

@@ -202,25 +202,21 @@ whenBlazorReady(() => {
 
     // Blazor Enhanced Navigation morphs the DOM in place. Alpine only scans for
     // `x-data` on its initial boot, so components inserted by a page swap arrive
-    // "dead", and components carried over from the previous page keep their old
-    // state (and timers). After each enhanced load we walk every TOP-LEVEL x-data
-    // root: tear down any live instance (clears its interval), then (re)initialize.
+    // "dead". After each enhanced load we initialize ONLY the subtrees Alpine
+    // hasn't seen yet.
     //
-    // We only touch top-level roots — Alpine.initTree / destroyTree recurse into
-    // nested x-data on their own, so handling children here would double-process.
+    // We must NOT destroy/re-init already-initialized components here. Two reasons:
+    //   1. enhancedload fires multiple times per navigation (once per streaming
+    //      update), so re-initializing would thrash a component repeatedly.
+    //   2. Persistent components in the layout (the nav menu, modals) survive
+    //      navigation with live state; tearing them down detaches their event
+    //      listeners and leaves buttons dead. Leave healthy components alone —
+    //      Alpine's own MutationObserver disposes ones that get removed.
     Blazor.addEventListener('enhancedload', () => {
         if (typeof Alpine === 'undefined') return;
-
-        const roots = Array.from(document.querySelectorAll('[x-data]')).filter(
-            (el) => !el.parentElement?.closest('[x-data]')
-        );
-
-        for (const root of roots) {
+        document.querySelectorAll('[x-data]').forEach((el) => {
             // _x_dataStack is set by Alpine once a node has been initialized.
-            if (root._x_dataStack) {
-                Alpine.destroyTree(root);
-            }
-            Alpine.initTree(root);
-        }
+            if (!el._x_dataStack) Alpine.initTree(el);
+        });
     });
 });

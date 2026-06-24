@@ -41,14 +41,16 @@
         <button type="button"
                 class="ml-auto grid h-10 w-10 place-items-center rounded-lg border border-line text-content md:hidden"
                 aria-label="Toggle menu"
-                @@click="open = !open">
+                x-on:click="open = !open">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
         </button>
     </nav>
 
-    <div class="border-t border-line/80 md:hidden" x-show="open" x-cloak x-transition>
+    @* Absolute so the open menu overlays the hero instead of pushing it down. *@
+    <div class="absolute inset-x-0 top-full z-40 border-b border-line/80 bg-ink/95 backdrop-blur-xl md:hidden"
+         x-show="open" x-cloak x-transition>
         <div class="space-y-1 px-4 py-3">
             <a href="movies" class="block rounded-lg px-3 py-2 text-sm text-content hover:bg-surface-2">Movies</a>
             <a href="series" class="block rounded-lg px-3 py-2 text-sm text-content hover:bg-surface-2">Series</a>
