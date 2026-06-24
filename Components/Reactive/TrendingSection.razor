@@ -1,0 +1,98 @@
+@inherits ReactiveBlazor.ReactiveComponent
+@using MoviesMafia.Services.Tmdb
+@using MoviesMafia.Services.Tmdb.Dtos
+@inject ITmdbClient Tmdb
+
+@* Trending movies row with Today / This Week filter. State lives server-side. *@
+<ReactiveRoot Owner="this">
+    <section class="mt-12">
+        <header class="mb-4 flex flex-wrap items-end justify-between gap-4">
+            <div>
+                <h2 class="text-2xl font-bold sm:text-3xl">Trending</h2>
+                <p class="mt-1 text-sm text-on-surface-variant">What everyone is watching right now.</p>
+            </div>
+            <div class="inline-flex rounded-full border border-line bg-surface p-1 text-sm">
+                <button type="button" class="@TabClass("day")" data-on-click="SetDay">Today</button>
+                <button type="button" class="@TabClass("week")" data-on-click="SetWeek">This week</button>
+            </div>
+        </header>
+
+        <div class="relative"
+             x-data="rowScroller">
+            <button type="button" x-on:click="scroll(-1)"
+                    class="absolute left-0 top-1/2 z-10 hidden -translate-x-2 -translate-y-1/2 rounded-full border border-line bg-surface/90 p-2 text-content shadow-lg backdrop-blur transition hover:bg-surface sm:flex"
+                    aria-label="Scroll left">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 11-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                </svg>
+            </button>
+
+            <div x-ref="row" class="scrollbar-hide -mx-2 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-2 pb-2">
+                @if (Items.Count == 0)
+                {
+                    <p class="px-2 py-10 text-on-surface-variant">No trending titles right now.</p>
+                }
+                else
+                {
+                    @foreach (var m in Items)
+                    {
+                        <div class="w-40 shrink-0 snap-start sm:w-48">
+                            <MediaCard Title="@(m.Title ?? "Untitled")"
+                                       PosterUrl="@Tmdb.ImageUrl(m.PosterPath)"
+                                       Overview="@m.Overview"
+                                       Year="@Year(m.ReleaseDate)"
+                                       Score="m.VoteAverage"
+                                       TrailerUrl="@($"/trailer/movie/{m.Id}")"
+                                       WatchUrl="@($"/watch/movie/{m.Id}")" />
+                        </div>
+                    }
+                }
+            </div>
+
+            <button type="button" x-on:click="scroll(1)"
+                    class="absolute right-0 top-1/2 z-10 hidden translate-x-2 -translate-y-1/2 rounded-full border border-line bg-surface/90 p-2 text-content shadow-lg backdrop-blur transition hover:bg-surface sm:flex"
+                    aria-label="Scroll right">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                </svg>
+            </button>
+
+        </div>
+    </section>
+</ReactiveRoot>
+
+@code {
+    public string Window { get; set; } = "day";
+
+    [ReactiveIgnore]
+    public List<MovieResult> Items { get; set; } = [];
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    [ReactiveAction]
+    public void SetDay() => Window = "day";
+
+    [ReactiveAction]
+    public void SetWeek() => Window = "week";
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            var page = await Tmdb.GetTrendingMoviesAsync(Window);
+            Items = page.Results.Take(16).ToList();
+        }
+        catch
+        {
+            Items = [];
+        }
+    }
+
+    private string TabClass(string value) =>
+        Window == value
+            ? "rounded-full px-4 py-1.5 font-semibold transition bg-brand text-on-brand"
+            : "rounded-full px-4 py-1.5 font-semibold transition text-on-surface-variant hover:text-on-surface";
+
+    private static string? Year(string? date) =>
+        !string.IsNullOrEmpty(date) && date.Length >= 4 ? date[..4] : null;
+}

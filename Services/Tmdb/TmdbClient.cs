@@ -60,6 +60,42 @@ public sealed class TmdbClient : ITmdbClient
         }
     }
 
+    public Task<MoviePage> GetTrendingMoviesAsync(string window = "day", int page = 1, CancellationToken ct = default)
+    {
+        var w = string.Equals(window, "week", StringComparison.OrdinalIgnoreCase) ? "week" : "day";
+        return GetAsync<MoviePage>($"trending/movie/{w}", new() { ["page"] = page.ToString() }, ct);
+    }
+
+    public Task<SeriesPage> GetTrendingSeriesAsync(string window = "day", int page = 1, CancellationToken ct = default)
+    {
+        var w = string.Equals(window, "week", StringComparison.OrdinalIgnoreCase) ? "week" : "day";
+        return GetAsync<SeriesPage>($"trending/tv/{w}", new() { ["page"] = page.ToString() }, ct);
+    }
+
+    public Task<MoviePage> GetPopularMoviesAsync(int page = 1, CancellationToken ct = default) =>
+        GetAsync<MoviePage>("movie/popular", new() { ["page"] = page.ToString() }, ct);
+
+    public Task<MoviePage> GetTopRatedMoviesAsync(int page = 1, CancellationToken ct = default) =>
+        GetAsync<MoviePage>("movie/top_rated", new() { ["page"] = page.ToString() }, ct);
+
+    public Task<MoviePage> GetUpcomingMoviesAsync(int page = 1, CancellationToken ct = default) =>
+        GetAsync<MoviePage>("movie/upcoming", new() { ["page"] = page.ToString() }, ct);
+
+    public Task<MoviePage> GetNowPlayingMoviesAsync(int page = 1, CancellationToken ct = default) =>
+        GetAsync<MoviePage>("movie/now_playing", new() { ["page"] = page.ToString() }, ct);
+
+    public Task<SeriesPage> GetPopularSeriesAsync(int page = 1, CancellationToken ct = default) =>
+        GetAsync<SeriesPage>("tv/popular", new() { ["page"] = page.ToString() }, ct);
+
+    public Task<SeriesPage> GetTopRatedSeriesAsync(int page = 1, CancellationToken ct = default) =>
+        GetAsync<SeriesPage>("tv/top_rated", new() { ["page"] = page.ToString() }, ct);
+
+    public Task<SeriesPage> GetOnTheAirSeriesAsync(int page = 1, CancellationToken ct = default) =>
+        GetAsync<SeriesPage>("tv/on_the_air", new() { ["page"] = page.ToString() }, ct);
+
+    public Task<SeriesPage> GetAiringTodaySeriesAsync(int page = 1, CancellationToken ct = default) =>
+        GetAsync<SeriesPage>("tv/airing_today", new() { ["page"] = page.ToString() }, ct);
+
     public string? ImageUrl(string? path, string size = "w500")
     {
         if (string.IsNullOrWhiteSpace(path))

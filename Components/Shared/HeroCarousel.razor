@@ -1,0 +1,135 @@
+@using MoviesMafia.Services.Tmdb
+@using MoviesMafia.Services.Tmdb.Dtos
+@inject ITmdbClient Tmdb
+
+@* Full-bleed hero carousel. Pure Alpine (factory registered in /app.js) + CSS. *@
+@if (_slides.Count > 0)
+{
+    <section class="relative w-full overflow-hidden bg-ink"
+             x-data="heroCarousel(@_slides.Count)"
+             x-on:mouseenter="paused = true"
+             x-on:mouseleave="paused = false">
+        <div class="relative h-[80vh] max-h-[780px] min-h-[560px] w-full">
+
+            @* Background layer per slide (image + gradients). pointer-events-none so clicks pass through. *@
+            @for (var i = 0; i < _slides.Count; i++)
+            {
+                var slide = _slides[i];
+                var idx = i;
+                <div x-show="active === @idx" x-transition.opacity.duration.700ms class="pointer-events-none absolute inset-0">
+                    @if (slide.BackdropUrl is not null)
+                    {
+                        <img src="@slide.BackdropUrl" alt="@slide.Title backdrop"
+                             class="absolute inset-0 h-full w-full object-cover"
+                             loading="@(idx == 0 ? "eager" : "lazy")" />
+                    }
+                    <div class="absolute inset-0 bg-gradient-to-t from-ink via-ink/70 to-transparent"></div>
+                    <div class="absolute inset-0 bg-gradient-to-r from-ink via-ink/60 to-transparent"></div>
+                </div>
+            }
+
+            @* Caption layer per slide. *@
+            @for (var i = 0; i < _slides.Count; i++)
+            {
+                var slide = _slides[i];
+                var idx = i;
+                <div x-show="active === @idx" x-transition.opacity.duration.700ms
+                     class="pointer-events-none absolute inset-0 flex items-end pb-20 sm:items-center sm:pb-0 sm:pt-24">
+                    <div class="pointer-events-auto w-full max-w-3xl px-6 sm:px-12">
+                        <span class="chip mb-4">@slide.Kind</span>
+                        <h1 class="text-3xl font-extrabold tracking-tight text-content drop-shadow-lg sm:text-5xl lg:text-6xl">
+                            @slide.Title
+                        </h1>
+                        <div class="mt-3 flex flex-wrap items-center gap-3 text-sm text-content/80">
+                            <RatingBadge Score="slide.Score" />
+                            @if (!string.IsNullOrWhiteSpace(slide.Year))
+                            {
+                                <span>@slide.Year</span>
+                            }
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(slide.Overview))
+                        {
+                            <p class="mt-4 line-clamp-3 max-w-2xl text-sm text-content/85 sm:text-base">@slide.Overview</p>
+                        }
+                        <div class="mt-6 flex flex-wrap gap-3">
+                            <a href="@slide.WatchUrl" class="btn-primary">▶ Watch now</a>
+                            <a href="@slide.TrailerUrl" class="btn-ghost">Watch trailer</a>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @if (_slides.Count > 1)
+            {
+                <button type="button" x-on:click="prev()"
+                        class="absolute left-4 top-1/2 z-20 hidden -translate-y-1/2 rounded-full border border-line bg-surface/80 p-3 text-content backdrop-blur transition hover:bg-surface sm:flex"
+                        aria-label="Previous slide">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 11-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+                <button type="button" x-on:click="next()"
+                        class="absolute right-4 top-1/2 z-20 hidden -translate-y-1/2 rounded-full border border-line bg-surface/80 p-3 text-content backdrop-blur transition hover:bg-surface sm:flex"
+                        aria-label="Next slide">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+
+                <div class="absolute bottom-6 left-1/2 z-20 flex -translate-x-1/2 gap-2">
+                    @for (var i = 0; i < _slides.Count; i++)
+                    {
+                        var dotIndex = i;
+                        <button type="button" x-on:click="go(@dotIndex)"
+                                x-bind:class="active === @dotIndex ? 'w-8 bg-brand' : 'w-2 bg-content/40 hover:bg-content/70'"
+                                class="h-2 rounded-full transition-all duration-300"
+                                aria-label="@($"Go to slide {dotIndex + 1}")"></button>
+                    }
+                </div>
+            }
+        </div>
+    </section>
+}
+
+@code {
+    private const int SlideCount = 6;
+    private List<Slide> _slides = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var page = await Tmdb.GetTrendingMoviesAsync("day");
+            _slides = page.Results
+                .Where(m => !string.IsNullOrWhiteSpace(m.BackdropPath))
+                .Take(SlideCount)
+                .Select(m => new Slide(
+                    Kind: "Trending movie",
+                    Title: m.Title ?? m.OriginalTitle ?? "Untitled",
+                    Overview: m.Overview,
+                    Year: Year(m.ReleaseDate),
+                    Score: m.VoteAverage,
+                    BackdropUrl: Tmdb.ImageUrl(m.BackdropPath, "original"),
+                    WatchUrl: $"/watch/movie/{m.Id}",
+                    TrailerUrl: $"/trailer/movie/{m.Id}"))
+                .ToList();
+        }
+        catch
+        {
+            _slides = [];
+        }
+    }
+
+    private static string? Year(string? date) =>
+        !string.IsNullOrEmpty(date) && date.Length >= 4 ? date[..4] : null;
+
+    public sealed record Slide(
+        string Kind,
+        string Title,
+        string? Overview,
+        string? Year,
+        double Score,
+        string? BackdropUrl,
+        string WatchUrl,
+        string TrailerUrl);
+}

@@ -5,6 +5,17 @@
 @source "../Components/**/*.cs";
 @source "../Endpoints/**/*.cs";
 
+/* Hide scrollbar but keep the element scrollable. Applied to horizontally-scrolling rows. */
+@layer utilities {
+    .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+    .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+    }
+}
+
 /*
   MoviesMafia design tokens — a modern, cinematic dark theme.
   Tailwind v4 is CSS-first: tokens declared here become utilities
