@@ -1,0 +1,104 @@
+@import "tailwindcss";
+
+/* Scan Razor components and C# for utility classes. */
+@source "../Components/**/*.razor";
+@source "../Components/**/*.cs";
+@source "../Endpoints/**/*.cs";
+
+/*
+  MoviesMafia design tokens — a modern, cinematic dark theme.
+  Tailwind v4 is CSS-first: tokens declared here become utilities
+  (e.g. bg-surface, text-brand, rounded-card).
+*/
+@theme {
+    --color-ink: #07080d;          /* page background, deepest */
+    --color-surface: #11131c;      /* cards / panels */
+    --color-surface-2: #1a1d2b;    /* raised surfaces, inputs */
+    --color-line: #262a3d;         /* hairline borders */
+
+    --color-brand: #e11d48;        /* rose-600 — primary accent */
+    --color-brand-strong: #be123c; /* rose-700 — hover */
+    --color-accent: #f59e0b;       /* amber — ratings/highlights */
+
+    --color-content: #e7e9f0;      /* primary text */
+    --color-muted: #9aa0b4;        /* secondary text */
+
+    --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+    --radius-card: 0.9rem;
+
+    --shadow-card: 0 10px 30px -12px rgba(0, 0, 0, 0.7);
+    --shadow-glow: 0 0 0 1px rgba(225, 29, 72, 0.4), 0 12px 40px -12px rgba(225, 29, 72, 0.45);
+}
+
+@layer base {
+    html {
+        scroll-behavior: smooth;
+    }
+
+    /* Alpine: hide elements until the framework initialises. */
+    [x-cloak] {
+        display: none !important;
+    }
+
+    body {
+        @apply bg-ink text-content font-sans antialiased min-h-screen;
+        background-image:
+            radial-gradient(60rem 40rem at 80% -10%, rgba(225, 29, 72, 0.12), transparent 60%),
+            radial-gradient(50rem 40rem at -10% 10%, rgba(99, 102, 241, 0.10), transparent 55%);
+        background-attachment: fixed;
+    }
+
+    h1, h2, h3 {
+        @apply font-semibold tracking-tight text-content;
+    }
+
+    a {
+        @apply transition-colors;
+    }
+}
+
+@layer components {
+    .btn,
+    .btn-primary,
+    .btn-ghost,
+    .btn-subtle {
+        @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium
+               transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/60
+               disabled:opacity-50 disabled:pointer-events-none;
+    }
+
+    .btn-primary {
+        @apply bg-brand text-white hover:bg-brand-strong shadow-[0_8px_24px_-10px_rgba(225,29,72,0.8)];
+    }
+
+    .btn-ghost {
+        @apply bg-surface-2/60 text-content hover:bg-surface-2 border border-line;
+    }
+
+    .btn-subtle {
+        @apply text-muted hover:text-content hover:bg-surface-2/60;
+    }
+
+    .card {
+        @apply bg-surface border border-line rounded-card shadow-[var(--shadow-card)];
+    }
+
+    .input {
+        @apply w-full rounded-lg bg-surface-2 border border-line px-3.5 py-2.5 text-sm text-content
+               placeholder:text-muted/70 focus:outline-none focus:border-brand/70 focus:ring-2 focus:ring-brand/30
+               transition;
+    }
+
+    .label {
+        @apply block text-sm font-medium text-muted mb-1.5;
+    }
+
+    .field-error {
+        @apply mt-1 text-xs text-brand;
+    }
+
+    .chip {
+        @apply inline-flex items-center gap-1.5 rounded-full border border-line bg-surface-2/60 px-3 py-1 text-xs text-muted;
+    }
+}

@@ -1,0 +1,73 @@
+@page "/account/profile"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Identity
+@using MoviesMafia.Domain.Entities
+@using MoviesMafia.Services.Storage
+@inject UserManager<AppUser> UserManager
+@inject IProfilePictureStore Avatars
+@inject AuthenticationStateProvider AuthState
+
+<PageTitle>Profile — MoviesMafia</PageTitle>
+
+<h1 class="text-3xl font-bold">Your profile</h1>
+
+<div class="mt-6 grid gap-6 lg:grid-cols-3">
+    <!-- Identity + avatar -->
+    <section class="card p-6">
+        <div class="flex items-center gap-4">
+            <img src="@Avatars.PublicPath(_user?.ProfilePictureFileName)" alt="Avatar"
+                 class="h-20 w-20 rounded-full border border-white/10 object-cover" />
+            <div>
+                <p class="text-lg font-semibold">@_user?.UserName</p>
+                <p class="text-sm text-on-surface-variant">@_user?.Email</p>
+            </div>
+        </div>
+
+        <StatusMessage IsError="true" Message="@Error" />
+        <StatusMessage Message="@Message" />
+
+        <!-- Avatar upload posts to a real endpoint (file upload + cookie-safe). -->
+        <form method="post" action="/account/avatar" enctype="multipart/form-data" class="mt-5 space-y-3"
+              x-data x-init="$el.querySelector('input[type=file]').addEventListener('change', e => $el.requestSubmit())">
+            <AntiforgeryToken />
+            <label class="label">Change profile picture</label>
+            <input class="input file:mr-3 file:rounded file:border-0 file:bg-surface-container-high file:px-3 file:py-1 file:text-on-surface"
+                   name="profilePicture" type="file" accept="image/*" />
+            <noscript><button type="submit" class="btn-ghost w-full">Upload</button></noscript>
+        </form>
+    </section>
+
+    <!-- Change password (ReactiveBlazor) -->
+    <section class="card p-6">
+        <h2 class="font-semibold">Change password</h2>
+        <div class="mt-4">
+            <UpdatePasswordForm />
+        </div>
+    </section>
+
+    <!-- Request a title (ReactiveBlazor) -->
+    <section>
+        <RequestMediaForm />
+    </section>
+</div>
+
+<section class="card mt-6 p-6">
+    <MediaRequestList />
+</section>
+
+@code {
+    [SupplyParameterFromQuery] public string? Error { get; set; }
+    [SupplyParameterFromQuery] public string? Message { get; set; }
+
+    private AppUser? _user;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthState.GetAuthenticationStateAsync();
+        var name = state.User.Identity?.Name;
+        if (name is not null)
+        {
+            _user = await UserManager.FindByNameAsync(name);
+        }
+    }
+}

@@ -1,0 +1,19 @@
+@* Inline status banner used by forms and flows. *@
+
+@if (!string.IsNullOrWhiteSpace(Message))
+{
+    <div class="@CssClass" role="alert">
+        @Message
+    </div>
+}
+
+@code {
+    [Parameter] public string? Message { get; set; }
+
+    /// <summary>When true the banner is styled as an error; otherwise as a success/info message.</summary>
+    [Parameter] public bool IsError { get; set; }
+
+    private string CssClass => IsError
+        ? "rounded-lg border border-brand/40 bg-brand/10 px-4 py-3 text-sm text-brand"
+        : "rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300";
+}

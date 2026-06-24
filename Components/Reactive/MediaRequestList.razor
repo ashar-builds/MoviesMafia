@@ -1,0 +1,66 @@
+@inherits ReactiveBlazor.ReactiveComponent
+@attribute [Authorize]
+@attribute [OnReactiveSignal<MediaRequestChanged>]
+@using System.Security.Claims
+@using MoviesMafia.Domain.Entities
+@using MoviesMafia.Services.Repositories
+@inject IMediaRequestRepository Requests
+@inject IHttpContextAccessor Http
+
+@* The user's pending requests with inline delete. Refreshes out-of-band when a new request is added. *@
+<ReactiveRoot Owner="this">
+    <div>
+        <h3 class="font-semibold">Your requests</h3>
+        @if (_items.Count == 0)
+        {
+            <p class="mt-2 text-sm text-on-surface-variant">You haven't requested any titles yet.</p>
+        }
+        else
+        {
+            <ul class="mt-3 divide-y divide-line">
+                @foreach (var r in _items)
+                {
+                    <li class="flex items-center justify-between gap-3 py-3">
+                        <div>
+                            <p class="text-sm font-medium">@r.Name @(r.Year > 0 ? $"({r.Year})" : "")</p>
+                            <p class="text-xs text-on-surface-variant">@r.Type · requested @r.CreatedAt.ToString("MMM d, yyyy")</p>
+                        </div>
+                        <button type="button" class="btn-subtle text-primary"
+                                data-on-click="Delete" data-args="[@r.Id]">Remove</button>
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+</ReactiveRoot>
+
+@code {
+    private List<MediaRequest> _items = [];
+
+    private string? UserId => Http.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (UserId is { } id)
+        {
+            _items = (await Requests.GetByUserAsync(id)).ToList();
+        }
+    }
+
+    [ReactiveAction]
+    public async Task Delete(int id)
+    {
+        var entity = await Requests.GetByIdAsync(id);
+        // Only allow deleting the caller's own requests.
+        if (entity is not null && entity.UserId == UserId)
+        {
+            Requests.Remove(entity);
+            await Requests.SaveChangesAsync();
+        }
+
+        if (UserId is { } uid)
+        {
+            _items = (await Requests.GetByUserAsync(uid)).ToList();
+        }
+    }
+}

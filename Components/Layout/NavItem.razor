@@ -1,0 +1,13 @@
+@* Desktop nav link with active-route highlighting. *@
+
+<NavLink href="@Href"
+         class="rounded-lg px-3 py-2 text-sm font-medium text-muted hover:bg-surface-2/60 hover:text-content"
+         ActiveClass="bg-surface-2 text-content"
+         Match="NavLinkMatch.Prefix">
+    @Label
+</NavLink>
+
+@code {
+    [Parameter, EditorRequired] public string Href { get; set; } = "";
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+}

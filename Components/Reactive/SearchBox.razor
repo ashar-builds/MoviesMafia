@@ -1,0 +1,121 @@
+@inherits ReactiveBlazor.ReactiveComponent
+@using MoviesMafia.Domain.Enums
+@using MoviesMafia.Services.Tmdb
+@inject ITmdbClient Tmdb
+
+@* Live search with debounced input and a Movie/Series toggle — all state lives server-side. *@
+<ReactiveRoot Owner="this">
+    <div>
+        <div class="flex flex-col gap-3 sm:flex-row">
+            <input class="input flex-1"
+                   placeholder="Search movies and series…"
+                   data-bind="Query"
+                   data-on-input="Search"
+                   data-debounce="350"
+                   value="@Query" />
+            <div class="flex gap-2">
+                <button type="button"
+                        class="@ToggleClass(MediaType.Movie)"
+                        data-on-click="SetMovies">Movies</button>
+                <button type="button"
+                        class="@ToggleClass(MediaType.Series)"
+                        data-on-click="SetSeries">Series</button>
+            </div>
+        </div>
+
+        <div class="mt-6">
+            @if (_searched && Results.Count == 0)
+            {
+                <p class="text-on-surface-variant">No @TypeLabel found for “@Query”.</p>
+            }
+            else if (Results.Count > 0)
+            {
+                <p class="mb-3 text-sm text-on-surface-variant">@Results.Count result(s) for “@Query”.</p>
+                <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                    @foreach (var r in Results)
+                    {
+                        <MediaCard Title="@r.Title"
+                                   PosterUrl="@r.PosterUrl"
+                                   Overview="@r.Overview"
+                                   Year="@r.Year"
+                                   Score="r.Score"
+                                   TrailerUrl="@r.TrailerUrl"
+                                   WatchUrl="@r.WatchUrl" />
+                    }
+                </div>
+            }
+            else
+            {
+                <p class="text-on-surface-variant">Start typing to search the @TypeLabel catalog.</p>
+            }
+        </div>
+    </div>
+</ReactiveRoot>
+
+@code {
+    public string Query { get; set; } = string.Empty;
+    public MediaType Type { get; set; } = MediaType.Movie;
+
+    [ReactiveIgnore]
+    public List<SearchHit> Results { get; set; } = [];
+
+    private bool _searched;
+    private string TypeLabel => Type == MediaType.Movie ? "movies" : "series";
+
+    [ReactiveAction]
+    public async Task Search()
+    {
+        await RunSearchAsync();
+    }
+
+    [ReactiveAction]
+    public async Task SetMovies()
+    {
+        Type = MediaType.Movie;
+        await RunSearchAsync();
+    }
+
+    [ReactiveAction]
+    public async Task SetSeries()
+    {
+        Type = MediaType.Series;
+        await RunSearchAsync();
+    }
+
+    private async Task RunSearchAsync()
+    {
+        Results = [];
+        _searched = !string.IsNullOrWhiteSpace(Query);
+        if (!_searched)
+        {
+            return;
+        }
+
+        if (Type == MediaType.Movie)
+        {
+            var page = await Tmdb.SearchMoviesAsync(Query);
+            Results = page.Results.Select(m => new SearchHit(
+                m.Title ?? "Untitled", Tmdb.ImageUrl(m.PosterPath), m.Overview,
+                Year(m.ReleaseDate), m.VoteAverage,
+                $"/trailer/movie/{m.Id}", $"/watch/movie/{m.Id}")).ToList();
+        }
+        else
+        {
+            var page = await Tmdb.SearchSeriesAsync(Query);
+            Results = page.Results.Select(s => new SearchHit(
+                s.Name ?? "Untitled", Tmdb.ImageUrl(s.PosterPath), s.Overview,
+                Year(s.FirstAirDate), s.VoteAverage,
+                $"/trailer/series/{s.Id}", $"/watch/series/{s.Id}")).ToList();
+        }
+    }
+
+    private string ToggleClass(MediaType type) =>
+        type == Type ? "btn-primary" : "btn-ghost";
+
+    private static string? Year(string? date) =>
+        !string.IsNullOrEmpty(date) && date.Length >= 4 ? date[..4] : null;
+
+    public sealed record SearchHit(
+        string Title, string? PosterUrl, string? Overview, string? Year,
+        double Score, string TrailerUrl, string WatchUrl);
+}

@@ -1,0 +1,154 @@
+@inherits ReactiveBlazor.ReactiveComponent
+@attribute [Authorize(Roles = "Admin")]
+@using Microsoft.AspNetCore.Identity
+@using MoviesMafia.Domain
+@using MoviesMafia.Domain.Entities
+@using MoviesMafia.Services.Storage
+@inject UserManager<AppUser> UserManager
+@inject IProfilePictureStore Avatars
+
+@* Admin user table with inline email edit and delete — every action re-authorized on the server. *@
+<ReactiveRoot Owner="this">
+    <div>
+        <StatusMessage IsError="@_isError" Message="@_message" />
+
+        <div class="mt-4 overflow-x-auto rounded-xl border border-white/10">
+            <table class="w-full text-sm">
+                <thead class="bg-surface-container-high text-left text-on-surface-variant">
+                    <tr>
+                        <th class="px-4 py-3 font-medium">User</th>
+                        <th class="px-4 py-3 font-medium">Email</th>
+                        <th class="px-4 py-3 font-medium text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-line">
+                    @if (_users.Count == 0)
+                    {
+                        <tr><td colspan="3" class="px-4 py-6 text-center text-on-surface-variant">No users found.</td></tr>
+                    }
+                    @foreach (var u in _users)
+                    {
+                        <tr>
+                            <td class="px-4 py-3">
+                                <div class="flex items-center gap-3">
+                                    <img src="@Avatars.PublicPath(u.ProfilePictureFileName)" alt=""
+                                         class="h-8 w-8 rounded-full border border-white/10 object-cover" />
+                                    <span class="font-medium">@u.UserName</span>
+                                </div>
+                            </td>
+                            <td class="px-4 py-3">
+                                @if (EditingId == u.Id)
+                                {
+                                    <input class="input py-1.5" data-bind="EditEmail" value="@EditEmail" />
+                                }
+                                else
+                                {
+                                    <span class="text-on-surface-variant">@u.Email</span>
+                                }
+                            </td>
+                            <td class="px-4 py-3">
+                                <div class="flex justify-end gap-2">
+                                    @if (EditingId == u.Id)
+                                    {
+                                        <button type="button" class="btn-primary px-3 py-1.5 text-xs"
+                                                data-on-click="SaveEmail" data-args="@IdArgs(u.Id)">Save</button>
+                                        <button type="button" class="btn-subtle px-3 py-1.5 text-xs"
+                                                data-on-click="CancelEdit">Cancel</button>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" class="btn-ghost px-3 py-1.5 text-xs"
+                                                data-on-click="BeginEdit" data-args="@IdArgs(u.Id)">Edit</button>
+                                        <button type="button" class="btn-subtle px-3 py-1.5 text-xs text-primary"
+                                                data-on-click="DeleteUser" data-args="@IdArgs(u.Id)">Delete</button>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</ReactiveRoot>
+
+@code {
+    public string? EditingId { get; set; }
+    public string EditEmail { get; set; } = string.Empty;
+
+    private List<AppUser> _users = [];
+    private string? _message;
+    private bool _isError;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _users = (await UserManager.GetUsersInRoleAsync(Roles.User))
+            .OrderBy(u => u.UserName)
+            .ToList();
+    }
+
+    [ReactiveAction]
+    public async Task BeginEdit(string id)
+    {
+        await LoadAsync();
+        EditingId = id;
+        EditEmail = _users.FirstOrDefault(u => u.Id == id)?.Email ?? string.Empty;
+        _message = null;
+    }
+
+    [ReactiveAction]
+    public async Task CancelEdit()
+    {
+        EditingId = null;
+        await LoadAsync();
+    }
+
+    [ReactiveAction]
+    public async Task SaveEmail(string id)
+    {
+        var user = await UserManager.FindByIdAsync(id);
+        if (user is not null)
+        {
+            user.Email = EditEmail;
+            user.NormalizedEmail = UserManager.NormalizeEmail(EditEmail);
+            var result = await UserManager.UpdateAsync(user);
+            Set(result.Succeeded ? $"Updated email for {user.UserName}." :
+                string.Join(" ", result.Errors.Select(e => e.Description)), !result.Succeeded);
+        }
+        EditingId = null;
+        await LoadAsync();
+    }
+
+    [ReactiveAction]
+    public async Task DeleteUser(string id)
+    {
+        var user = await UserManager.FindByIdAsync(id);
+        if (user is not null)
+        {
+            var name = user.UserName;
+            var avatar = user.ProfilePictureFileName;
+            var result = await UserManager.DeleteAsync(user);
+            if (result.Succeeded)
+            {
+                await Avatars.DeleteAsync(avatar);
+                Set($"Deleted user {name}.", error: false);
+            }
+            else
+            {
+                Set(string.Join(" ", result.Errors.Select(e => e.Description)), error: true);
+            }
+        }
+        await LoadAsync();
+    }
+
+    private void Set(string message, bool error)
+    {
+        _message = message;
+        _isError = error;
+    }
+
+    // JSON array for data-args; Razor HTML-encodes the double quotes once to &quot;.
+    private static string IdArgs(string id) => System.Text.Json.JsonSerializer.Serialize(new[] { id });
+}

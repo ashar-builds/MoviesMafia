@@ -1,0 +1,16 @@
+@* Centered card shell for authentication screens. *@
+
+<div class="card w-full max-w-[28rem] p-8">
+    <h1 class="text-2xl font-bold">@Title</h1>
+    @if (!string.IsNullOrWhiteSpace(Subtitle))
+    {
+        <p class="mt-1 text-sm text-on-surface-variant">@Subtitle</p>
+    }
+    @ChildContent
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

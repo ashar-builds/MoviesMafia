@@ -1,0 +1,54 @@
+@page "/series"
+@using MoviesMafia.Services.Tmdb
+@inject ITmdbClient Tmdb
+
+<PageTitle>Series — MoviesMafia</PageTitle>
+
+<header class="mb-6">
+    <h1 class="text-3xl font-bold">Popular series</h1>
+    <p class="mt-1 text-on-surface-variant">Binge-worthy shows, sorted by what everyone's watching.</p>
+</header>
+
+@if (_error is not null)
+{
+    <StatusMessage IsError="true" Message="@_error" />
+}
+else
+{
+    <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+        @foreach (var s in _page.Results)
+        {
+            <MediaCard Title="@(s.Name ?? "Untitled")"
+                       PosterUrl="@Tmdb.ImageUrl(s.PosterPath)"
+                       Overview="@s.Overview"
+                       Year="@Year(s.FirstAirDate)"
+                       Score="s.VoteAverage"
+                       TrailerUrl="@($"/trailer/series/{s.Id}")"
+                       WatchUrl="@($"/watch/series/{s.Id}")" />
+        }
+    </div>
+
+    <Pager BasePath="/series" Page="_page.Page" TotalPages="_page.TotalPages" />
+}
+
+@code {
+    [SupplyParameterFromQuery] public int Page { get; set; }
+
+    private Services.Tmdb.Dtos.SeriesPage _page = new();
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _page = await Tmdb.DiscoverSeriesAsync(Page < 1 ? 1 : Page);
+        }
+        catch
+        {
+            _error = "We couldn't load series right now. Please try again shortly.";
+        }
+    }
+
+    private static string? Year(string? date) =>
+        !string.IsNullOrEmpty(date) && date.Length >= 4 ? date[..4] : null;
+}

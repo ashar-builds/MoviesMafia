@@ -1,0 +1,11 @@
+@page "/admin/users"
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Manage users — MoviesMafia</PageTitle>
+
+<header class="mb-6">
+    <h1 class="text-3xl font-bold">Manage users</h1>
+    <p class="mt-1 text-on-surface-variant">Edit emails or remove accounts. Changes apply in place.</p>
+</header>
+
+<AdminUserManager />

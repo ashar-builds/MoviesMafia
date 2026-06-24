@@ -1,0 +1,47 @@
+@page "/account/signup"
+@layout AuthLayout
+
+<PageTitle>Create account — MoviesMafia</PageTitle>
+
+<AuthCard Title="Create your account" Subtitle="Join MoviesMafia to request titles and build your profile.">
+    <StatusMessage IsError="true" Message="@Error" />
+
+    <form method="post" action="/account/register" enctype="multipart/form-data" class="mt-6 space-y-4">
+        <AntiforgeryToken />
+
+        <div>
+            <label class="label" for="username">Username</label>
+            <input class="input" id="username" name="Username" maxlength="20" autocomplete="username" required autofocus />
+        </div>
+        <div>
+            <label class="label" for="email">Email</label>
+            <input class="input" id="email" name="Email" type="email" autocomplete="email" required />
+        </div>
+        <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+                <label class="label" for="password">Password</label>
+                <input class="input" id="password" name="Password" type="password" autocomplete="new-password" required />
+            </div>
+            <div>
+                <label class="label" for="confirm">Confirm</label>
+                <input class="input" id="confirm" name="ConfirmPassword" type="password" autocomplete="new-password" required />
+            </div>
+        </div>
+        <div>
+            <label class="label" for="picture">Profile picture <span class="text-on-surface-variant/70">(optional)</span></label>
+            <input class="input file:mr-3 file:rounded file:border-0 file:bg-surface-container-high file:px-3 file:py-1 file:text-on-surface"
+                   id="picture" name="profilePicture" type="file" accept="image/*" />
+        </div>
+
+        <button type="submit" class="btn-primary w-full">Create account</button>
+    </form>
+
+    <p class="mt-6 text-center text-sm text-on-surface-variant">
+        Already have an account?
+        <a href="/account/login" class="font-medium text-primary hover:text-primary-strong">Sign in</a>
+    </p>
+</AuthCard>
+
+@code {
+    [SupplyParameterFromQuery] public string? Error { get; set; }
+}

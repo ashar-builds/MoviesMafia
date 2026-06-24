@@ -1,0 +1,72 @@
+@inherits ReactiveBlazor.ReactiveComponent
+@using MoviesMafia.Domain.Enums
+@using MoviesMafia.Services.Tmdb
+@inject ITmdbClient Tmdb
+
+@* Trailer carousel: the current index lives in server state; prev/next morph the iframe in place. *@
+<ReactiveRoot Owner="this">
+    <div>
+        @if (_keys.Count == 0)
+        {
+            <div class="card p-10 text-center text-on-surface-variant">No trailers available for this title.</div>
+        }
+        else
+        {
+            <div class="aspect-video w-full overflow-hidden rounded-xl border border-white/10 bg-black shadow-[var(--shadow-2xl)]">
+                <iframe src="@CurrentEmbed" class="h-full w-full" allowfullscreen
+                        referrerpolicy="origin"></iframe>
+            </div>
+            <div class="mt-4 flex items-center justify-between gap-3">
+                <button type="button" class="btn-ghost" data-on-click="Previous" disabled="@(Index == 0)">← Previous</button>
+                <span class="chip">@(_titles[Index]) · @(Index + 1)/@_keys.Count</span>
+                <button type="button" class="btn-ghost" data-on-click="Next" disabled="@(Index >= _keys.Count - 1)">Next →</button>
+            </div>
+        }
+    </div>
+</ReactiveRoot>
+
+@code {
+    [Parameter] public int TmdbId { get; set; }
+    [Parameter] public string MediaKind { get; set; } = "movie";
+
+    // Persisted as state across dispatches.
+    public int Index { get; set; }
+
+    // Loaded each render from TMDB (cheap, and avoids bloating the encrypted state token).
+    private List<string> _keys = [];
+    private List<string> _titles = [];
+
+    private string CurrentEmbed => $"https://www.youtube.com/embed/{_keys[Index]}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var isSeries = string.Equals(MediaKind, "series", StringComparison.OrdinalIgnoreCase);
+        var videos = isSeries
+            ? await Tmdb.GetSeriesVideosAsync(TmdbId)
+            : await Tmdb.GetMovieVideosAsync(TmdbId);
+
+        var trailers = videos.Results
+            .Where(v => v.IsYouTubeTrailer && (v.Type is "Trailer" or "Teaser"))
+            .ToList();
+
+        _keys = trailers.Select(v => v.Key!).ToList();
+        _titles = trailers.Select(v => v.Name ?? "Trailer").ToList();
+
+        if (Index >= _keys.Count)
+        {
+            Index = Math.Max(0, _keys.Count - 1);
+        }
+    }
+
+    [ReactiveAction]
+    public void Next()
+    {
+        if (Index < _keys.Count - 1) Index++;
+    }
+
+    [ReactiveAction]
+    public void Previous()
+    {
+        if (Index > 0) Index--;
+    }
+}

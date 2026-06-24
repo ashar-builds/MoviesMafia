@@ -1,98 +1,88 @@
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
-using MoviesMafia.Configurations;
-using MoviesMafia.Models;
-using MoviesMafia.Models.GenericRepo;
-using MoviesMafia.Models.Repo;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Options;
+using MoviesMafia.Components;
+using MoviesMafia.Data;
+using MoviesMafia.Data.Seed;
+using MoviesMafia.Domain.Entities;
+using MoviesMafia.Endpoints;
+using MoviesMafia.Services;
+using MoviesMafia.Services.Storage;
+using ReactiveBlazor;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Configuration.SetupAppSettings();
+// Application services: options, EF Core, TMDB client, repositories, email, storage, embed builder.
+builder.Services.AddMoviesMafiaServices(builder.Configuration);
 
-var connectionString = AppSettings.ConnectionStrings.DefaultConnection;
-var adminDetails = AppSettings.AdminDetails; 
+// ASP.NET Identity with cookie authentication (Static SSR — sign-in/out happen via endpoints).
+builder.Services
+    .AddIdentityCore<AppUser>(options =>
+    {
+        options.SignIn.RequireConfirmedEmail = true;
+        options.User.RequireUniqueEmail = true;
+    })
+    .AddRoles<IdentityRole>()
+    .AddEntityFrameworkStores<AppDbContext>()
+    .AddSignInManager()
+    .AddDefaultTokenProviders();
 
-// Add services to the container.
+builder.Services
+    .AddAuthentication(IdentityConstants.ApplicationScheme)
+    .AddIdentityCookies();
 
-builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
-
-builder.Services.Configure<IdentityOptions>(options => options.SignIn.RequireConfirmedEmail = true);
-builder.Services.AddIdentity<AppUser, IdentityRole>().AddEntityFrameworkStores<AppDbContext>().AddDefaultTokenProviders();
-builder.Services.AddScoped<IUserRepo, UserRepo>();
-builder.Services.AddScoped<IAPICalls, APICalls>();
-builder.Services.AddScoped<IRecordsRepo, RecordsRepo>();
-builder.Services.AddScoped(typeof(IGenericRepo<>), typeof(GenericRepo<>));
-builder.Services.AddHttpContextAccessor();
-// Add additional services, etc.
-builder.Services.AddControllersWithViews();
 builder.Services.ConfigureApplicationCookie(options =>
 {
     options.ExpireTimeSpan = TimeSpan.FromDays(30);
     options.SlidingExpiration = true;
+    options.LoginPath = "/account/login";
+    options.LogoutPath = "/account/logout";
+    options.AccessDeniedPath = "/account/access-denied";
 });
 
+builder.Services.AddAuthorization();
+builder.Services.AddCascadingAuthenticationState();
+
+// Blazor Static SSR (no interactive render modes — interactivity is provided by ReactiveBlazor).
+builder.Services.AddRazorComponents();
+
+// ReactiveBlazor encrypts component state with ASP.NET Data Protection.
+builder.Services.AddDataProtection();
+builder.Services.AddReactiveComponents(assemblies: typeof(Program).Assembly);
 
 var app = builder.Build();
 
-using var scope = app.Services.CreateScope();
-
-using var appDbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-await appDbContext.Database.MigrateAsync();
-
-
-using var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-if (!await roleManager.RoleExistsAsync("Admin"))
-{
-    var adminRole = new IdentityRole("Admin");
-    await roleManager.CreateAsync(adminRole);
-}
-
-if (!await roleManager.RoleExistsAsync("User"))
-{
-    var userRole = new IdentityRole("User");
-    await roleManager.CreateAsync(userRole);
-}
-
-
-var adminPassword = adminDetails.Password;
-var adminUsername = adminDetails.UserName;
-var adminEmail = adminDetails.Email;
-var adminProfilePicturePath = adminDetails.ProfilePicturePath;
-using var userManager = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
-var adminUser = await userManager.FindByNameAsync(adminUsername);
-if (adminUser == null)
-{
-    adminUser = new AppUser
-    {
-        UserName = adminUsername,
-        Email = adminEmail,
-        EmailConfirmed = true,
-        LockoutEnabled = false,
-        ProfilePicturePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "ProfilePictures", adminProfilePicturePath)
-    };
-    var result = await userManager.CreateAsync(adminUser, adminPassword);
-    if (result.Succeeded)
-    {
-        await userManager.AddToRoleAsync(adminUser, "Admin");
-    }
-
-}
-
-// Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Home/Error");
+    app.UseExceptionHandler("/error", createScopeForErrors: true);
+    app.UseHsts();
 }
-app.UseStaticFiles();
 
-app.UseRouting();
+app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 
+app.UseHttpsRedirection();
+app.UseAuthentication();
 app.UseAuthorization();
+app.UseAntiforgery();
 
-app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=LandingPage}/{action=LandingPage}/{id?}");
+app.MapStaticAssets();
+
+// Serve user avatars from the configured storage folder (kept outside wwwroot).
+var storage = app.Services.GetRequiredService<IOptions<StorageOptions>>().Value;
+var avatarsRoot = Path.IsPathRooted(storage.AvatarsPath)
+    ? storage.AvatarsPath
+    : Path.Combine(app.Environment.ContentRootPath, storage.AvatarsPath);
+Directory.CreateDirectory(avatarsRoot);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(avatarsRoot),
+    RequestPath = storage.AvatarsRequestPath,
+});
+
+app.MapReactiveComponents();
+app.MapRazorComponents<App>();
+app.MapAccountEndpoints();
+
+await IdentitySeeder.MigrateAndSeedAsync(app.Services);
+
 app.Run();
-
-
-

@@ -1,0 +1,56 @@
+@page "/movies"
+@using MoviesMafia.Services.Tmdb
+@inject ITmdbClient Tmdb
+
+<PageTitle>Movies — MoviesMafia</PageTitle>
+
+<header class="mb-6 flex items-end justify-between gap-4">
+    <div>
+        <h1 class="text-3xl font-bold">Popular movies</h1>
+        <p class="mt-1 text-on-surface-variant">Trending titles from around the world.</p>
+    </div>
+</header>
+
+@if (_error is not null)
+{
+    <StatusMessage IsError="true" Message="@_error" />
+}
+else
+{
+    <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+        @foreach (var m in _page.Results)
+        {
+            <MediaCard Title="@(m.Title ?? "Untitled")"
+                       PosterUrl="@Tmdb.ImageUrl(m.PosterPath)"
+                       Overview="@m.Overview"
+                       Year="@Year(m.ReleaseDate)"
+                       Score="m.VoteAverage"
+                       TrailerUrl="@($"/trailer/movie/{m.Id}")"
+                       WatchUrl="@($"/watch/movie/{m.Id}")" />
+        }
+    </div>
+
+    <Pager BasePath="/movies" Page="_page.Page" TotalPages="_page.TotalPages" />
+}
+
+@code {
+    [SupplyParameterFromQuery] public int Page { get; set; }
+
+    private Services.Tmdb.Dtos.MoviePage _page = new();
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _page = await Tmdb.DiscoverMoviesAsync(Page < 1 ? 1 : Page);
+        }
+        catch
+        {
+            _error = "We couldn't load movies right now. Please try again shortly.";
+        }
+    }
+
+    private static string? Year(string? date) =>
+        !string.IsNullOrEmpty(date) && date.Length >= 4 ? date[..4] : null;
+}

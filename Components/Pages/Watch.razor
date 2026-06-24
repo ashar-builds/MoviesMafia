@@ -1,0 +1,109 @@
+@page "/watch/{Type}/{TmdbId:int}"
+@attribute [Authorize]
+@using MoviesMafia.Services.Streaming
+@using MoviesMafia.Services.Tmdb
+@inject ITmdbClient Tmdb
+@inject IEmbedUrlBuilder Embed
+
+<PageTitle>@(_title ?? "Watch") — MoviesMafia</PageTitle>
+
+<div class="mb-4 flex items-center justify-between gap-4">
+    <h1 class="text-2xl font-bold">@(_title ?? "Now playing")</h1>
+
+    @* Ad-blocker advisory: pure client-side modal via Alpine. *@
+    <div x-data="{ open: false }" class="relative">
+        <button type="button" class="btn-ghost" @@click="open = true">Playback tips</button>
+        <div x-show="open" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+             @@click.self="open = false" @@keydown.escape.window="open = false">
+            <div class="card max-w-[28rem] p-6">
+                <h2 class="text-lg font-semibold">Heads up</h2>
+                <p class="mt-2 text-sm text-on-surface-variant">
+                    This player streams from a third-party provider that may show pop-up ads.
+                    Using a reputable ad blocker is strongly recommended for the best experience.
+                </p>
+                <div class="mt-5 text-right">
+                    <button type="button" class="btn-primary" @@click="open = false">Got it</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (_error is not null)
+{
+    <StatusMessage IsError="true" Message="@_error" />
+}
+else
+{
+    @if (IsSeries && _details is not null)
+    {
+        <div class="mb-4 grid gap-3 sm:grid-cols-2">
+            <div>
+                <label class="label" for="season">Season</label>
+                <select id="season" class="input" onchange="window.location.href='/watch/series/@TmdbId?season='+this.value+'&episode=1'">
+                    @foreach (var s in _details.Seasons.Where(s => s.SeasonNumber >= 1))
+                    {
+                        <option value="@s.SeasonNumber" selected="@(s.SeasonNumber == SeasonNumber)">
+                            @(s.Name ?? $"Season {s.SeasonNumber}") (@s.EpisodeCount eps)
+                        </option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label class="label" for="episode">Episode</label>
+                <select id="episode" class="input" onchange="window.location.href='/watch/series/@TmdbId?season=@SeasonNumber&episode='+this.value">
+                    @for (var e = 1; e <= EpisodeCountForSeason; e++)
+                    {
+                        var ep = e;
+                        <option value="@ep" selected="@(ep == EpisodeNumber)">Episode @ep</option>
+                    }
+                </select>
+            </div>
+        </div>
+    }
+
+    <div class="aspect-video w-full overflow-hidden rounded-xl border border-white/10 bg-black shadow-[var(--shadow-2xl)]">
+        <iframe src="@_embedUrl" class="h-full w-full" allowfullscreen
+                referrerpolicy="origin" sandbox="allow-scripts allow-same-origin allow-presentation"></iframe>
+    </div>
+}
+
+@code {
+    [Parameter] public string Type { get; set; } = "movie";
+    [Parameter] public int TmdbId { get; set; }
+    [SupplyParameterFromQuery] public int Season { get; set; }
+    [SupplyParameterFromQuery] public int Episode { get; set; }
+
+    private string? _embedUrl;
+    private string? _title;
+    private string? _error;
+    private Services.Tmdb.Dtos.SeriesDetails? _details;
+
+    private bool IsSeries => string.Equals(Type, "series", StringComparison.OrdinalIgnoreCase);
+    private int SeasonNumber => Season < 1 ? 1 : Season;
+    private int EpisodeNumber => Episode < 1 ? 1 : Episode;
+
+    private int EpisodeCountForSeason =>
+        _details?.Seasons.FirstOrDefault(s => s.SeasonNumber == SeasonNumber)?.EpisodeCount ?? 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            if (IsSeries)
+            {
+                _details = await Tmdb.GetSeriesDetailsAsync(TmdbId);
+                _title = _details?.Name;
+                _embedUrl = Embed.Episode(TmdbId, SeasonNumber, EpisodeNumber);
+            }
+            else
+            {
+                _embedUrl = Embed.Movie(TmdbId);
+            }
+        }
+        catch
+        {
+            _error = "We couldn't start playback right now. Please try again shortly.";
+        }
+    }
+}
