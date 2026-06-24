@@ -67,6 +67,10 @@
     a {
         @apply transition-colors;
     }
+
+    h1:focus {
+        outline: none;
+    }
 }
 
 @layer components {

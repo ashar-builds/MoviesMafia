@@ -6,7 +6,7 @@ namespace MoviesMafia.Services.Repositories;
 
 public sealed class MediaRequestRepository : Repository<MediaRequest>, IMediaRequestRepository
 {
-    public MediaRequestRepository(AppDbContext db) : base(db) { }
+    public MediaRequestRepository(IDbContextFactory<AppDbContext> dbFactory) : base(dbFactory) { }
 
     public async Task<IReadOnlyList<MediaRequest>> GetByUserAsync(string userId, CancellationToken ct = default) =>
         await Set.AsNoTracking()
