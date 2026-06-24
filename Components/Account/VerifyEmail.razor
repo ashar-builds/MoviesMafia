@@ -1,0 +1,53 @@
+@page "/account/verify-email"
+@layout AuthLayout
+@using Microsoft.AspNetCore.Identity
+@using MoviesMafia.Domain.Entities
+@inject UserManager<AppUser> UserManager
+
+<PageTitle>Verify email — MoviesMafia</PageTitle>
+
+<AuthCard Title="Email verification">
+    <div class="mt-4">
+        @if (_succeeded)
+        {
+            <StatusMessage Message="Your email is confirmed. You can sign in now." />
+            <a href="/account/login" class="btn-primary mt-6 w-full">Continue to sign in</a>
+        }
+        else
+        {
+            <StatusMessage IsError="true" Message="@(_error ?? "We couldn't confirm your email address.")" />
+            <a href="/account/signup" class="btn-ghost mt-6 w-full">Back to sign up</a>
+        }
+    </div>
+</AuthCard>
+
+@code {
+    [SupplyParameterFromQuery] public string? Email { get; set; }
+    [SupplyParameterFromQuery] public string? Token { get; set; }
+
+    private bool _succeeded;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Email) || string.IsNullOrWhiteSpace(Token))
+        {
+            _error = "The verification link is invalid or incomplete.";
+            return;
+        }
+
+        var user = await UserManager.FindByEmailAsync(Email);
+        if (user is null)
+        {
+            _error = "No account was found for this email.";
+            return;
+        }
+
+        var result = await UserManager.ConfirmEmailAsync(user, Token);
+        _succeeded = result.Succeeded;
+        if (!_succeeded)
+        {
+            _error = "This verification link has expired or already been used.";
+        }
+    }
+}

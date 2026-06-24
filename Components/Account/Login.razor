@@ -1,0 +1,36 @@
+@page "/account/login"
+@layout AuthLayout
+
+<PageTitle>Sign in — MoviesMafia</PageTitle>
+
+<AuthCard Title="Welcome back" Subtitle="Sign in to continue to MoviesMafia.">
+    <StatusMessage IsError="true" Message="@Error" />
+    <StatusMessage Message="@Message" />
+
+    <form method="post" action="/account/login" class="mt-6 space-y-4">
+        <AntiforgeryToken />
+        <input type="hidden" name="returnUrl" value="@ReturnUrl" />
+
+        <div>
+            <label class="label" for="username">Username</label>
+            <input class="input" id="username" name="username" autocomplete="username" required autofocus />
+        </div>
+        <div>
+            <label class="label" for="password">Password</label>
+            <input class="input" id="password" name="password" type="password" autocomplete="current-password" required />
+        </div>
+
+        <button type="submit" class="btn-primary w-full">Sign in</button>
+    </form>
+
+    <p class="mt-6 text-center text-sm text-on-surface-variant">
+        New here?
+        <a href="/account/signup" class="font-medium text-primary hover:text-primary-strong">Create an account</a>
+    </p>
+</AuthCard>
+
+@code {
+    [SupplyParameterFromQuery] public string? Error { get; set; }
+    [SupplyParameterFromQuery] public string? Message { get; set; }
+    [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
+}

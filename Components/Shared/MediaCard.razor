@@ -1,0 +1,57 @@
+@* Presentational poster card. On desktop the Trailer/Watch overlay reveals on
+   hover; on touch devices (no hover) it stays visible so the actions are reachable. *@
+
+<div class="group card overflow-hidden">
+    <div class="relative aspect-[2/3] overflow-hidden bg-surface-2">
+        @if (PosterUrl is not null)
+        {
+            <img src="@PosterUrl" alt="@Title poster" loading="lazy"
+                 class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+        }
+        else
+        {
+            <div class="flex h-full items-center justify-center text-muted">No image</div>
+        }
+
+        <div class="absolute right-2 top-2">
+            <RatingBadge Score="Score" />
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Badge))
+        {
+            <span class="chip absolute left-2 top-2 bg-ink/70 backdrop-blur">@Badge</span>
+        }
+
+        @* Overlay: gradient + overview + action buttons. Visible by default (touch),
+           hover-reveal from sm: up where a pointer exists. *@
+        <div class="absolute inset-0 flex flex-col justify-end gap-3 bg-gradient-to-t from-ink via-ink/80 to-transparent p-3 opacity-100 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100">
+            @if (!string.IsNullOrWhiteSpace(Overview))
+            {
+                <p class="hidden line-clamp-4 text-xs text-content/90 sm:block">@Overview</p>
+            }
+            <div class="flex gap-2">
+                <a href="@TrailerUrl" class="btn-ghost flex-1 px-2 py-2 text-xs sm:py-1.5">Trailer</a>
+                <a href="@WatchUrl" class="btn-primary flex-1 px-2 py-2 text-xs sm:py-1.5">▶ Watch</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="p-3">
+        <h3 class="truncate text-sm font-semibold" title="@Title">@Title</h3>
+        @if (!string.IsNullOrWhiteSpace(Year))
+        {
+            <p class="text-xs text-muted">@Year</p>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public string? PosterUrl { get; set; }
+    [Parameter] public string? Overview { get; set; }
+    [Parameter] public string? Year { get; set; }
+    [Parameter] public double Score { get; set; }
+    [Parameter] public string? Badge { get; set; }
+    [Parameter, EditorRequired] public string TrailerUrl { get; set; } = "";
+    [Parameter, EditorRequired] public string WatchUrl { get; set; } = "";
+}

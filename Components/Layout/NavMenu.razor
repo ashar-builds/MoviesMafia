@@ -1,0 +1,79 @@
+@* Top navigation. Mobile menu and the account dropdown are pure client-side state via Alpine. *@
+
+<header class="sticky top-0 z-40 border-b border-line/80 bg-ink/80 backdrop-blur-xl relative"
+        x-data="{ open: false }">
+    @* Top-loading progress bar. Driven by app.js on Blazor navigation. *@
+    <div id="nav-progress"
+         class="pointer-events-none absolute inset-x-0 bottom-0 z-50 h-0.5 origin-left bg-brand"
+         style="transform:scaleX(0);opacity:0"></div>
+    <nav class="flex w-full items-center gap-4 px-4 py-3 sm:px-6 lg:px-10">
+        <a href="/" class="flex shrink-0 items-center gap-2 text-lg font-extrabold tracking-tight">
+            <span class="grid h-8 w-8 place-items-center rounded-lg bg-brand text-white">M</span>
+            <span>Movies<span class="text-brand">Mafia</span></span>
+        </a>
+
+        <div class="hidden items-center gap-1 md:flex">
+            <NavItem Href="movies" Label="Movies" />
+            <NavItem Href="series" Label="Series" />
+            <NavItem Href="search" Label="Search" />
+            <NavItem Href="about" Label="About" />
+            <AuthorizeView Roles="Admin">
+                <NavItem Href="admin/users" Label="Admin" />
+            </AuthorizeView>
+        </div>
+
+        <div class="ml-auto hidden items-center gap-2 md:flex">
+            <AuthorizeView>
+                <Authorized>
+                    <a href="account/profile" class="btn-ghost">@context.User.Identity?.Name</a>
+                    <form method="post" action="/account/logout">
+                        <AntiforgeryToken />
+                        <button type="submit" class="btn-subtle">Sign out</button>
+                    </form>
+                </Authorized>
+                <NotAuthorized>
+                    <a href="account/login" class="btn-subtle">Sign in</a>
+                    <a href="account/signup" class="btn-primary">Get started</a>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
+
+        <button type="button"
+                class="ml-auto grid h-10 w-10 place-items-center rounded-lg border border-line text-content md:hidden"
+                aria-label="Toggle menu"
+                x-on:click="open = !open">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+        </button>
+    </nav>
+
+    @* Absolute so the open menu overlays the hero instead of pushing it down. *@
+    <div class="absolute inset-x-0 top-full z-40 border-b border-line/80 bg-ink/95 backdrop-blur-xl md:hidden"
+         x-show="open" x-cloak x-transition>
+        <div class="space-y-1 px-4 py-3">
+            <a href="movies" class="block rounded-lg px-3 py-2 text-sm text-content hover:bg-surface-2">Movies</a>
+            <a href="series" class="block rounded-lg px-3 py-2 text-sm text-content hover:bg-surface-2">Series</a>
+            <a href="search" class="block rounded-lg px-3 py-2 text-sm text-content hover:bg-surface-2">Search</a>
+            <a href="about" class="block rounded-lg px-3 py-2 text-sm text-content hover:bg-surface-2">About</a>
+            <AuthorizeView Roles="Admin">
+                <a href="admin/users" class="block rounded-lg px-3 py-2 text-sm text-content hover:bg-surface-2">Admin</a>
+            </AuthorizeView>
+            <div class="mt-2 flex gap-2 border-t border-line/80 pt-3">
+                <AuthorizeView>
+                    <Authorized>
+                        <a href="account/profile" class="btn-ghost flex-1">Profile</a>
+                        <form method="post" action="/account/logout" class="flex-1">
+                            <AntiforgeryToken />
+                            <button type="submit" class="btn-subtle w-full">Sign out</button>
+                        </form>
+                    </Authorized>
+                    <NotAuthorized>
+                        <a href="account/login" class="btn-ghost flex-1">Sign in</a>
+                        <a href="account/signup" class="btn-primary flex-1">Get started</a>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </div>
+        </div>
+    </div>
+</header>

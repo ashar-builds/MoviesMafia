@@ -1,0 +1,120 @@
+@page "/"
+@using MoviesMafia.Services.Tmdb
+@using MoviesMafia.Services.Tmdb.Dtos
+@inject ITmdbClient Tmdb
+
+<PageTitle>MoviesMafia — Stream the classics</PageTitle>
+
+@* Hero is full-bleed (no padding around it). *@
+<HeroCarousel Slides="_hero" />
+
+@* Everything else uses the immersive full-width canvas with breathing room. *@
+<div class="w-full px-4 pb-16 sm:px-6 lg:px-10">
+
+    @if (_loadError is not null)
+    {
+        <StatusMessage IsError="true" Message="@_loadError" />
+    }
+
+    @* Server-driven filters via ReactiveBlazor. *@
+    <TrendingSection />
+    <PopularSection />
+
+    <MediaRow Title="Now playing in theaters" Subtitle="Catch the latest releases" MoreUrl="/movies">
+        @foreach (var m in _nowPlaying)
+        {
+            @MovieCard(m)
+        }
+    </MediaRow>
+
+    <MediaRow Title="Top rated movies" Subtitle="The all-time greats according to TMDB" MoreUrl="/movies">
+        @foreach (var m in _topRatedMovies)
+        {
+            @MovieCard(m)
+        }
+    </MediaRow>
+
+    <MediaRow Title="Upcoming movies" Subtitle="Mark your calendar">
+        @foreach (var m in _upcoming)
+        {
+            @MovieCard(m)
+        }
+    </MediaRow>
+
+    <MediaRow Title="On the air" Subtitle="Series with new episodes airing now" MoreUrl="/series">
+        @foreach (var s in _onTheAir)
+        {
+            @SeriesCard(s)
+        }
+    </MediaRow>
+
+    <MediaRow Title="Top rated series" Subtitle="Binge-worthy classics">
+        @foreach (var s in _topRatedSeries)
+        {
+            @SeriesCard(s)
+        }
+    </MediaRow>
+
+</div>
+
+@code {
+    private const int RowSize = HomeMappers.RowSize;
+
+    private List<HeroSlide> _hero = new();
+    private List<MovieResult> _nowPlaying = new();
+    private List<MovieResult> _topRatedMovies = new();
+    private List<MovieResult> _upcoming = new();
+    private List<SeriesResult> _onTheAir = new();
+    private List<SeriesResult> _topRatedSeries = new();
+    private string? _loadError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var heroTask = Tmdb.GetTrendingMoviesAsync("day");
+            var nowPlayingTask = Tmdb.GetNowPlayingMoviesAsync();
+            var topRatedMoviesTask = Tmdb.GetTopRatedMoviesAsync();
+            var upcomingTask = Tmdb.GetUpcomingMoviesAsync();
+            var onTheAirTask = Tmdb.GetOnTheAirSeriesAsync();
+            var topRatedSeriesTask = Tmdb.GetTopRatedSeriesAsync();
+
+            await Task.WhenAll(heroTask, nowPlayingTask, topRatedMoviesTask, upcomingTask, onTheAirTask, topRatedSeriesTask);
+
+            _hero = HomeMappers.ToHeroSlides((await heroTask).Results, Tmdb);
+            _nowPlaying = (await nowPlayingTask).Results.Take(RowSize).ToList();
+            _topRatedMovies = (await topRatedMoviesTask).Results.Take(RowSize).ToList();
+            _upcoming = (await upcomingTask).Results.Take(RowSize).ToList();
+            _onTheAir = (await onTheAirTask).Results.Take(RowSize).ToList();
+            _topRatedSeries = (await topRatedSeriesTask).Results.Take(RowSize).ToList();
+        }
+        catch
+        {
+            _loadError = "We couldn't load the homepage right now. Please try again shortly.";
+        }
+    }
+
+    private static string? Year(string? date) => HomeMappers.Year(date);
+
+    private RenderFragment MovieCard(MovieResult m) =>
+        @<div class="w-40 shrink-0 snap-start sm:w-48">
+            <MediaCard Title="@(m.Title ?? "Untitled")"
+                       PosterUrl="@Tmdb.ImageUrl(m.PosterPath)"
+                       Overview="@m.Overview"
+                       Year="@Year(m.ReleaseDate)"
+                       Score="m.VoteAverage"
+                       TrailerUrl="@($"/trailer/movie/{m.Id}")"
+                       WatchUrl="@($"/watch/movie/{m.Id}")" />
+        </div>;
+
+    private RenderFragment SeriesCard(SeriesResult s) =>
+        @<div class="w-40 shrink-0 snap-start sm:w-48">
+            <MediaCard Title="@(s.Name ?? "Untitled")"
+                       PosterUrl="@Tmdb.ImageUrl(s.PosterPath)"
+                       Overview="@s.Overview"
+                       Year="@Year(s.FirstAirDate)"
+                       Score="s.VoteAverage"
+                       TrailerUrl="@($"/trailer/series/{s.Id}")"
+                       WatchUrl="@($"/watch/series/{s.Id}")" />
+        </div>;
+}

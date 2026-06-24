@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/m.ashar/source/repos/**)",
+      "Bash(where ls *)",
+      "Bash(dotnet --list-sdks)",
+      "Bash(\"/c/Program Files/dotnet/dotnet.exe\" --list-sdks)",
+      "Bash(dotnet --list-runtimes)",
+      "Bash(dotnet.exe --list-sdks)",
+      "Bash(mkdir -p \"/c/Users/m.ashar/.claude/plans\" 2>/dev/null; echo done)",
+      "Bash(git checkout *)",
+      "Bash(\"/c/Program Files/Git/cmd/git.exe\" -C \"c:/Users/m.ashar/source/repos/MoviesMafia\" checkout -b feat/blazor-ssr-net10-migration)",
+      "Bash(\"/c/Program Files/Git/cmd/git.exe\" -C \"c:/Users/m.ashar/source/repos/MoviesMafia\" branch --show-current)",
+      "Bash(\"/c/Program Files/dotnet/dotnet.exe\" new blazor --help)",
+      "Read(//c/tmp/**)",
+      "Bash(rm -rf bzref)",
+      "Bash(\"/c/Program Files/dotnet/dotnet.exe\" new blazor -n BzRef -o bzref --framework net10.0 --interactivity None --auth None --no-https --no-restore)",
+      "Bash(\"/c/Program Files/Git/cmd/git.exe\" -C /tmp/bzref ls-files --others --exclude-standard)",
+      "Read(//tmp/**)",
+      "Read(//c/Users/m.ashar/AppData/Local/Temp/bzref/Components/**)",
+      "Read(//c/Users/m.ashar/AppData/Local/Temp/bzref/**)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\m.ashar\\.claude\\plans"
+    ]
+  }
+}

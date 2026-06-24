@@ -362,3 +362,14 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 /.env
+
+# MoviesMafia: Tailwind-generated CSS (build output)
+wwwroot/app.css
+
+# MoviesMafia: local secrets — never commit. Real values live in user-secrets
+# (dotnet user-secrets, loaded automatically in Development) or, in production,
+# in appsettings.Production.json injected by the deploy workflow. appsettings.json
+# is committed as a template with empty/placeholder values only.
+appsettings.Development.json
+appsettings.Production.json
+appsettings.*.Local.json

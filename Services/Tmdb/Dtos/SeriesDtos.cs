@@ -1,0 +1,58 @@
+namespace MoviesMafia.Services.Tmdb.Dtos;
+
+/// <summary>A single TV series from a TMDB discover/search response.</summary>
+public sealed class SeriesResult
+{
+    public int Id { get; set; }
+    public string? Name { get; set; }
+    public string? OriginalName { get; set; }
+    public string? Overview { get; set; }
+    public string? PosterPath { get; set; }
+    public string? BackdropPath { get; set; }
+    public string? FirstAirDate { get; set; }
+    public double VoteAverage { get; set; }
+    public int VoteCount { get; set; }
+    public double Popularity { get; set; }
+}
+
+/// <summary>A paged TMDB series list response.</summary>
+public sealed class SeriesPage
+{
+    public int Page { get; set; }
+    public List<SeriesResult> Results { get; set; } = [];
+    public int TotalPages { get; set; }
+    public int TotalResults { get; set; }
+}
+
+/// <summary>Detailed TMDB series info, including the season list used by the episode picker.</summary>
+public sealed class SeriesDetails
+{
+    public int Id { get; set; }
+    public string? Name { get; set; }
+    public string? Overview { get; set; }
+    public string? PosterPath { get; set; }
+    public string? BackdropPath { get; set; }
+    public string? FirstAirDate { get; set; }
+    public double VoteAverage { get; set; }
+    public int? NumberOfSeasons { get; set; }
+    public int? NumberOfEpisodes { get; set; }
+    public List<SeriesGenre> Genres { get; set; } = [];
+    public List<SeriesSeason> Seasons { get; set; } = [];
+}
+
+public sealed class SeriesGenre
+{
+    public int Id { get; set; }
+    public string? Name { get; set; }
+}
+
+public sealed class SeriesSeason
+{
+    public int Id { get; set; }
+    public string? Name { get; set; }
+    public string? Overview { get; set; }
+    public string? PosterPath { get; set; }
+    public string? AirDate { get; set; }
+    public int EpisodeCount { get; set; }
+    public int SeasonNumber { get; set; }
+}

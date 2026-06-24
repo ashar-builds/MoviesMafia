@@ -1,0 +1,29 @@
+@page "/search"
+
+<PageTitle>Search — MoviesMafia</PageTitle>
+
+<div class="w-full px-4 py-8 sm:px-6 lg:px-10">
+    <header class="mb-6">
+        <h1 class="text-3xl font-bold">Search</h1>
+        <p class="mt-1 text-muted">Find any movie or series. Filter, sort, and dig as deep as you like.</p>
+    </header>
+
+    @* Recent searches live OUTSIDE the reactive component (which Idiomorph
+       morphs on every dispatch) so their Alpine state + localStorage survive.
+       The factory records the active query after each successful dispatch and
+       refills the search input when a chip is clicked. *@
+    <div x-data="recentSearches">
+        <template x-if="items.length">
+            <div class="mb-5 flex flex-wrap items-center gap-2">
+                <span class="text-xs font-medium uppercase tracking-wide text-muted">Recent</span>
+                <template x-for="q in items" :key="q">
+                    <button type="button" class="chip hover:border-brand/60 hover:text-content"
+                            x-on:click="apply(q)" x-text="q"></button>
+                </template>
+                <button type="button" class="btn-subtle text-xs" x-on:click="clearAll()">Clear</button>
+            </div>
+        </template>
+
+        <SearchBox />
+    </div>
+</div>

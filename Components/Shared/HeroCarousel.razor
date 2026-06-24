@@ -1,0 +1,104 @@
+@* Full-bleed hero carousel. Pure Alpine (factory registered in /app.js) + CSS.
+   The caller supplies the Slides list — works for movies, series, or any mix.
+
+   Visibility model: every slide is always rendered and absolutely stacked.
+   Exactly one slide is opaque at a time, driven by an inline `style` that
+   Alpine owns via x-bind:style (inline style beats utility classes, so there
+   is never a class-vs-class conflict). A CSS transition handles the crossfade.
+   We intentionally avoid x-show / x-transition here: under Blazor enhanced
+   navigation the DOM is morphed in place and Alpine's transition queue can be
+   interrupted, leaving multiple slides stuck visible. Opacity is deterministic. *@
+
+@if (Slides.Count > 0)
+{
+    <section class="relative w-full overflow-hidden bg-ink"
+             x-data="heroCarousel(@Slides.Count)"
+             x-on:mouseenter="paused = true"
+             x-on:mouseleave="paused = false">
+        <div class="relative h-[80vh] max-h-[780px] min-h-[420px] w-full sm:min-h-[560px]">
+
+            @for (var i = 0; i < Slides.Count; i++)
+            {
+                var slide = Slides[i];
+                var idx = i;
+                @* Server-render slide 0 visible so there is no flash before
+                   Alpine boots; x-bind:style takes over immediately after. *@
+                <div class="absolute inset-0 transition-opacity duration-700 ease-in-out"
+                     style="@(idx == 0 ? "opacity:1;z-index:10" : "opacity:0;z-index:0;pointer-events:none")"
+                     x-bind:style="active === @idx
+                         ? 'opacity:1;z-index:10'
+                         : 'opacity:0;z-index:0;pointer-events:none'">
+
+                    @if (slide.BackdropUrl is not null)
+                    {
+                        <img src="@slide.BackdropUrl" alt="@slide.Title backdrop"
+                             class="absolute inset-0 h-full w-full object-cover"
+                             loading="@(idx == 0 ? "eager" : "lazy")" />
+                    }
+                    <div class="absolute inset-0 bg-gradient-to-t from-ink via-ink/70 to-transparent"></div>
+                    <div class="absolute inset-0 bg-gradient-to-r from-ink via-ink/60 to-transparent"></div>
+
+                    <div class="absolute inset-0 flex items-end pb-20 sm:items-center sm:pb-0 sm:pt-24">
+                        <div class="w-full max-w-3xl px-6 sm:px-12">
+                            <span class="chip mb-4">@slide.Kind</span>
+                            <h1 class="text-3xl font-extrabold tracking-tight text-content drop-shadow-lg sm:text-5xl lg:text-6xl">
+                                @slide.Title
+                            </h1>
+                            <div class="mt-3 flex flex-wrap items-center gap-3 text-sm text-content/80">
+                                <RatingBadge Score="slide.Score" />
+                                @if (!string.IsNullOrWhiteSpace(slide.Year))
+                                {
+                                    <span>@slide.Year</span>
+                                }
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(slide.Overview))
+                            {
+                                <p class="mt-4 line-clamp-3 max-w-2xl text-sm text-content/85 sm:text-base">@slide.Overview</p>
+                            }
+                            <div class="mt-6 flex flex-wrap gap-3">
+                                <a href="@slide.WatchUrl" class="btn-primary">▶ Watch now</a>
+                                <a href="@slide.TrailerUrl" class="btn-ghost">Watch trailer</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @if (Slides.Count > 1)
+            {
+                <button type="button" x-on:click="prev()"
+                        class="absolute left-4 top-1/2 z-20 hidden -translate-y-1/2 rounded-full border border-line bg-surface/80 p-3 text-content backdrop-blur transition hover:bg-surface sm:flex"
+                        aria-label="Previous slide">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 11-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+                <button type="button" x-on:click="next()"
+                        class="absolute right-4 top-1/2 z-20 hidden -translate-y-1/2 rounded-full border border-line bg-surface/80 p-3 text-content backdrop-blur transition hover:bg-surface sm:flex"
+                        aria-label="Next slide">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+
+                @* Each button is a ≥40px tall/wide tap target; the visible dot is the inner span. *@
+                <div class="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 sm:bottom-6">
+                    @for (var i = 0; i < Slides.Count; i++)
+                    {
+                        var dotIndex = i;
+                        <button type="button" x-on:click="go(@dotIndex)"
+                                class="flex h-10 items-center justify-center px-1.5"
+                                aria-label="@($"Go to slide {dotIndex + 1}")">
+                            <span x-bind:class="active === @dotIndex ? 'w-8 bg-brand' : 'w-2 bg-content/40 hover:bg-content/70'"
+                                  class="h-2 rounded-full transition-all duration-300"></span>
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<HeroSlide> Slides { get; set; } = [];
+}

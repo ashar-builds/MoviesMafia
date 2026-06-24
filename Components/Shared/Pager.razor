@@ -1,0 +1,37 @@
+@* Enhanced-navigation pager. Builds prev/next links on the current page's path with a ?page= query. *@
+
+@if (TotalPages > 1)
+{
+    <nav class="mt-8 flex flex-wrap items-center justify-center gap-2 sm:gap-3" aria-label="Pagination">
+        @if (Page > 1)
+        {
+            <a class="btn-ghost" href="@PageHref(Page - 1)">← Previous</a>
+        }
+        else
+        {
+            <span class="btn-ghost pointer-events-none opacity-40">← Previous</span>
+        }
+
+        <span class="chip">Page @Page of @DisplayTotal</span>
+
+        @if (Page < TotalPages)
+        {
+            <a class="btn-ghost" href="@PageHref(Page + 1)">Next →</a>
+        }
+        else
+        {
+            <span class="btn-ghost pointer-events-none opacity-40">Next →</span>
+        }
+    </nav>
+}
+
+@code {
+    [Parameter, EditorRequired] public string BasePath { get; set; } = "";
+    [Parameter] public int Page { get; set; } = 1;
+    [Parameter] public int TotalPages { get; set; } = 1;
+
+    // TMDB caps usable pagination at 500.
+    private int DisplayTotal => Math.Min(TotalPages, 500);
+
+    private string PageHref(int page) => $"{BasePath}?page={page}";
+}

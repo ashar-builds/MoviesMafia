@@ -1,0 +1,48 @@
+@page "/about"
+
+<PageTitle>About — MoviesMafia</PageTitle>
+
+<div class="w-full px-4 py-8 sm:px-6 lg:px-10">
+<div class="mx-auto max-w-3xl">
+    <h1 class="text-3xl font-bold">About MoviesMafia</h1>
+    <p class="mt-4 text-on-surface-variant">
+        MoviesMafia is a movie and series discovery app powered by The Movie Database (TMDB).
+        It's also a working showcase for <span class="text-on-surface font-medium">ReactiveBlazor</span> —
+        stateful, interactive components on Blazor Static SSR with no SignalR circuit and no WebAssembly.
+    </p>
+
+    <div class="mt-8 grid gap-4 sm:grid-cols-3">
+        @foreach (var f in Features)
+        {
+            <div class="card p-5">
+                <div class="text-2xl">@f.Icon</div>
+                <h3 class="mt-3 font-semibold">@f.Title</h3>
+                <p class="mt-1 text-sm text-on-surface-variant">@f.Body</p>
+            </div>
+        }
+    </div>
+
+    <div class="card mt-8 p-6">
+        <h2 class="font-semibold">Built with</h2>
+        <div class="mt-3 flex flex-wrap gap-2">
+            <span class="chip">Blazor Static SSR · .NET 10</span>
+            <span class="chip">ReactiveBlazor</span>
+            <span class="chip">Tailwind CSS v4</span>
+            <span class="chip">Alpine.js</span>
+            <span class="chip">PostgreSQL · EF Core</span>
+            <span class="chip">TMDB API</span>
+        </div>
+    </div>
+</div>
+</div>
+
+@code {
+    private record Feature(string Icon, string Title, string Body);
+
+    private static readonly Feature[] Features =
+    [
+        new("🎬", "Discover", "Browse popular movies and series, refreshed from TMDB."),
+        new("⚡", "Reactive", "Search, trailers and more update in place — no full page reloads."),
+        new("🍿", "Watch", "Stream trailers and full titles right in the browser."),
+    ];
+}

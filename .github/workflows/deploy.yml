@@ -1,0 +1,213 @@
+name: Deploy to MonsterASP
+
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-monsterasp
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build-and-deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Restore NuGet packages
+        run: dotnet restore MoviesMafia.csproj
+
+      - name: Build Tailwind CSS
+        run: |
+          npm install --no-save @tailwindcss/cli
+          npx @tailwindcss/cli -i Styles/app.tailwind.css -o wwwroot/app.css --minify
+
+      - name: Publish application
+        run: dotnet publish MoviesMafia.csproj -c Release -o ./publish -p:SkipTailwindBuild=true --no-restore
+
+      - name: Inject production configuration
+        env:
+          CONNECTION_STRING: ${{ secrets.DEFAULT_CONNECTION_STRING }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          STREAMING_AUTOEMBED_URL: ${{ secrets.STREAMING_AUTOEMBED_URL }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SMTP_FROM_ADDRESS: ${{ secrets.SMTP_FROM_ADDRESS }}
+          SMTP_FROM_NAME: ${{ secrets.SMTP_FROM_NAME }}
+          SMTP_ENABLE_SSL: ${{ secrets.SMTP_ENABLE_SSL }}
+          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          ADMIN_PROFILE_PICTURE: ${{ secrets.ADMIN_PROFILE_PICTURE }}
+        run: |
+          # Required secrets — fail fast (with every missing one listed) if any is unset.
+          #   DB + TMDB: app won't boot without them.
+          #   ADMIN_*: the startup seeder needs these or there's no way into /admin.
+          #   SMTP_*: Identity requires confirmed email (RequireConfirmedEmail = true),
+          #           so without working SMTP users can't confirm accounts and sign in.
+          missing=""
+          for pair in \
+            "DEFAULT_CONNECTION_STRING:$CONNECTION_STRING" \
+            "TMDB_API_KEY:$TMDB_API_KEY" \
+            "ADMIN_USERNAME:$ADMIN_USERNAME" \
+            "ADMIN_EMAIL:$ADMIN_EMAIL" \
+            "ADMIN_PASSWORD:$ADMIN_PASSWORD" \
+            "SMTP_HOST:$SMTP_HOST" \
+            "SMTP_USERNAME:$SMTP_USERNAME" \
+            "SMTP_PASSWORD:$SMTP_PASSWORD"; do
+            name="${pair%%:*}"
+            value="${pair#*:}"
+            if [ -z "$value" ]; then
+              echo "::error::Required secret $name is not set."
+              missing="$missing $name"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing required secrets:$missing"
+            exit 1
+          fi
+          # Write appsettings.Production.json with secrets-only overrides.
+          # ASP.NET Core layers it on top of appsettings.json at runtime, so only
+          # the values that differ from the committed defaults need to be present.
+          # Optional keys are emitted only when their secret is set, so an unset
+          # secret falls back to the appsettings.json default rather than blanking it.
+          python3 - <<'PY'
+          import json, os
+
+          def opt(d, key, env, transform=str):
+              v = os.environ.get(env, "")
+              if v:
+                  d[key] = transform(v)
+
+          def as_bool(v):
+              return str(v).strip().lower() in ("true", "1", "yes", "on")
+
+          smtp = {}
+          opt(smtp, "Host", "SMTP_HOST")
+          opt(smtp, "Port", "SMTP_PORT", int)
+          opt(smtp, "UserName", "SMTP_USERNAME")
+          opt(smtp, "Password", "SMTP_PASSWORD")
+          opt(smtp, "FromAddress", "SMTP_FROM_ADDRESS")
+          opt(smtp, "FromName", "SMTP_FROM_NAME")
+          opt(smtp, "EnableSsl", "SMTP_ENABLE_SSL", as_bool)
+
+          admin = {}
+          opt(admin, "UserName", "ADMIN_USERNAME")
+          opt(admin, "Email", "ADMIN_EMAIL")
+          opt(admin, "Password", "ADMIN_PASSWORD")
+          opt(admin, "ProfilePictureFileName", "ADMIN_PROFILE_PICTURE")
+
+          cfg = {
+              "ConnectionStrings": {
+                  "DefaultConnection": os.environ["CONNECTION_STRING"]
+              },
+              "Tmdb": {
+                  "ApiKey": os.environ["TMDB_API_KEY"]
+              },
+          }
+
+          autoembed = os.environ.get("STREAMING_AUTOEMBED_URL", "")
+          if autoembed:
+              cfg["Streaming"] = {"AutoEmbedUrl": autoembed}
+          if smtp:
+              cfg["Smtp"] = smtp
+          if admin:
+              cfg["AdminSeed"] = admin
+
+          with open("./publish/appsettings.Production.json", "w", encoding="utf-8") as f:
+              json.dump(cfg, f, indent=2)
+          print("Wrote ./publish/appsettings.Production.json with keys:", ", ".join(cfg.keys()))
+          PY
+
+      - name: Install lftp
+        run: sudo apt-get update && sudo apt-get install -y lftp
+
+      - name: Take application offline
+        env:
+          SFTP_PASSWORD: ${{ secrets.MONSTERASP_FTP_PASSWORD }}
+          SFTP_USER: ${{ secrets.MONSTERASP_FTP_USERNAME }}
+          SFTP_HOST: ${{ secrets.MONSTERASP_FTP_SERVER }}
+          SFTP_DIR: ${{ secrets.MONSTERASP_FTP_SERVER_DIR || '/wwwroot' }}
+        run: |
+          cat > ./app_offline.htm <<'HTML'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8" />
+            <title>Deploying — MoviesMafia</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <style>
+              body { font-family: 'Inter', system-ui, sans-serif; background: #07080d; color: #e7e9f0;
+                     display: grid; place-items: center; min-height: 100vh; margin: 0; }
+              .card { max-width: 32rem; padding: 2.5rem; text-align: center; }
+              .pill { display: inline-block; padding: .25rem .75rem; border-radius: 9999px;
+                      background: #e11d48; color: #fff; font-weight: 600; font-size: .75rem;
+                      letter-spacing: .05em; text-transform: uppercase; }
+              h1 { font-size: 2rem; margin: 1rem 0 .5rem; }
+              p { color: #9aa0b4; line-height: 1.6; }
+            </style>
+          </head>
+          <body>
+            <main class="card">
+              <span class="pill">Deploying</span>
+              <h1>We're shipping new stuff</h1>
+              <p>MoviesMafia is briefly offline while we deploy the latest version. Refresh in a few seconds.</p>
+            </main>
+          </body>
+          </html>
+          HTML
+          lftp -c "set sftp:auto-confirm yes; \
+                   open -u $SFTP_USER,$SFTP_PASSWORD sftp://$SFTP_HOST:22; \
+                   put -O $SFTP_DIR ./app_offline.htm"
+          sleep 5
+
+      - name: Deploy via SFTP
+        env:
+          SFTP_PASSWORD: ${{ secrets.MONSTERASP_FTP_PASSWORD }}
+          SFTP_USER: ${{ secrets.MONSTERASP_FTP_USERNAME }}
+          SFTP_HOST: ${{ secrets.MONSTERASP_FTP_SERVER }}
+          SFTP_DIR: ${{ secrets.MONSTERASP_FTP_SERVER_DIR || '/wwwroot' }}
+        run: |
+          cd ./publish
+          lftp -c "set sftp:auto-confirm yes; \
+                   set mirror:set-permissions no; \
+                   open -u $SFTP_USER,$SFTP_PASSWORD sftp://$SFTP_HOST:22; \
+                   mirror -R --transfer-all --verbose --exclude-glob app_offline.htm . $SFTP_DIR"
+
+      - name: Bring application online
+        if: always()
+        env:
+          SFTP_PASSWORD: ${{ secrets.MONSTERASP_FTP_PASSWORD }}
+          SFTP_USER: ${{ secrets.MONSTERASP_FTP_USERNAME }}
+          SFTP_HOST: ${{ secrets.MONSTERASP_FTP_SERVER }}
+          SFTP_DIR: ${{ secrets.MONSTERASP_FTP_SERVER_DIR || '/wwwroot' }}
+        run: |
+          if ! command -v lftp &> /dev/null; then
+            sudo apt-get update && sudo apt-get install -y lftp
+          fi
+          lftp -c "set sftp:auto-confirm yes; \
+                   open -u $SFTP_USER,$SFTP_PASSWORD sftp://$SFTP_HOST:22; \
+                   rm -f $SFTP_DIR/app_offline.htm"

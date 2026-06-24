@@ -1,0 +1,90 @@
+@inherits ReactiveBlazor.ReactiveComponent
+@attribute [Authorize]
+@using System.Security.Claims
+@using MoviesMafia.Domain.Entities
+@using MoviesMafia.Domain.Enums
+@using MoviesMafia.Services.Repositories
+@inject IMediaRequestRepository Requests
+@inject IHttpContextAccessor Http
+
+@* Request a title. Inline feedback + a 24h rate limit enforced server-side via a cookie. *@
+<ReactiveRoot Owner="this">
+    <div class="card p-6">
+        <h3 class="font-semibold">Can't find something?</h3>
+        <p class="mt-1 text-sm text-on-surface-variant">Request a movie or series and we'll look into adding it.</p>
+
+        <StatusMessage IsError="@_isError" Message="@_message" />
+
+        <div class="mt-4 grid gap-3 sm:grid-cols-[1fr_120px_140px]">
+            <input class="input" placeholder="Title" data-bind="Name" value="@Name" />
+            <input class="input" type="number" placeholder="Year" data-bind="Year" value="@(Year == 0 ? "" : Year)" />
+            <select class="input" data-bind="Type">
+                <option value="Movie" selected="@(Type == MediaType.Movie)">Movie</option>
+                <option value="Series" selected="@(Type == MediaType.Series)">Series</option>
+            </select>
+        </div>
+        <button type="button" class="btn-primary mt-4" data-on-click="Submit">Submit request</button>
+    </div>
+</ReactiveRoot>
+
+@code {
+    public string Name { get; set; } = string.Empty;
+    public int Year { get; set; }
+    public MediaType Type { get; set; } = MediaType.Movie;
+
+    private string? _message;
+    private bool _isError;
+
+    [ReactiveAction]
+    public async Task Submit()
+    {
+        var ctx = Http.HttpContext;
+        var userId = ctx?.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId is null)
+        {
+            Set("You must be signed in to request a title.", error: true);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(Name))
+        {
+            Set("Please enter a title.", error: true);
+            return;
+        }
+
+        var cookieName = $"media_request_{userId}";
+        if (ctx!.Request.Cookies.ContainsKey(cookieName))
+        {
+            Set("You've already requested a title in the last 24 hours. Please try again later.", error: true);
+            return;
+        }
+
+        await Requests.AddAsync(new MediaRequest
+        {
+            UserId = userId,
+            Name = Name.Trim(),
+            Year = Year,
+            Type = Type,
+        });
+        await Requests.SaveChangesAsync();
+
+        ctx.Response.Cookies.Append(cookieName, "1", new CookieOptions
+        {
+            Expires = DateTimeOffset.UtcNow.AddDays(1),
+            HttpOnly = true,
+            IsEssential = true,
+        });
+
+        ReactiveSignals.Publish<MediaRequestChanged>();
+
+        Set($"Thanks! Your request for “{Name.Trim()}” has been received.", error: false);
+        Name = string.Empty;
+        Year = 0;
+    }
+
+    private void Set(string message, bool error)
+    {
+        _message = message;
+        _isError = error;
+    }
+}

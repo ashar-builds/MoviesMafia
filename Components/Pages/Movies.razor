@@ -1,0 +1,92 @@
+@page "/movies"
+@using MoviesMafia.Services.Tmdb
+@using MoviesMafia.Services.Tmdb.Dtos
+@inject ITmdbClient Tmdb
+
+<PageTitle>Movies — MoviesMafia</PageTitle>
+
+<HeroCarousel Slides="_hero" />
+
+<div class="w-full px-4 pb-16 sm:px-6 lg:px-10">
+
+    @if (_loadError is not null)
+    {
+        <StatusMessage IsError="true" Message="@_loadError" />
+    }
+
+    <TrendingSection Kind="movies" />
+
+    <MediaRow Title="Popular movies" Subtitle="Loved by everyone">
+        @foreach (var m in _popular)
+        {
+            @Card(m)
+        }
+    </MediaRow>
+
+    <MediaRow Title="Now playing in theaters" Subtitle="Catch the latest releases">
+        @foreach (var m in _nowPlaying)
+        {
+            @Card(m)
+        }
+    </MediaRow>
+
+    <MediaRow Title="Top rated movies" Subtitle="The all-time greats according to TMDB">
+        @foreach (var m in _topRated)
+        {
+            @Card(m)
+        }
+    </MediaRow>
+
+    <MediaRow Title="Upcoming movies" Subtitle="Mark your calendar">
+        @foreach (var m in _upcoming)
+        {
+            @Card(m)
+        }
+    </MediaRow>
+</div>
+
+@code {
+    private const int RowSize = HomeMappers.RowSize;
+
+    private List<HeroSlide> _hero = new();
+    private List<MovieResult> _popular = new();
+    private List<MovieResult> _nowPlaying = new();
+    private List<MovieResult> _topRated = new();
+    private List<MovieResult> _upcoming = new();
+    private string? _loadError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var heroTask = Tmdb.GetTrendingMoviesAsync("day");
+            var popularTask = Tmdb.GetPopularMoviesAsync();
+            var nowPlayingTask = Tmdb.GetNowPlayingMoviesAsync();
+            var topRatedTask = Tmdb.GetTopRatedMoviesAsync();
+            var upcomingTask = Tmdb.GetUpcomingMoviesAsync();
+
+            await Task.WhenAll(heroTask, popularTask, nowPlayingTask, topRatedTask, upcomingTask);
+
+            _hero = HomeMappers.ToHeroSlides((await heroTask).Results, Tmdb, "Trending movie");
+            _popular = (await popularTask).Results.Take(RowSize).ToList();
+            _nowPlaying = (await nowPlayingTask).Results.Take(RowSize).ToList();
+            _topRated = (await topRatedTask).Results.Take(RowSize).ToList();
+            _upcoming = (await upcomingTask).Results.Take(RowSize).ToList();
+        }
+        catch
+        {
+            _loadError = "We couldn't load movies right now. Please try again shortly.";
+        }
+    }
+
+    private RenderFragment Card(MovieResult m) =>
+        @<div class="w-40 shrink-0 snap-start sm:w-48">
+            <MediaCard Title="@(m.Title ?? "Untitled")"
+                       PosterUrl="@Tmdb.ImageUrl(m.PosterPath)"
+                       Overview="@m.Overview"
+                       Year="@HomeMappers.Year(m.ReleaseDate)"
+                       Score="m.VoteAverage"
+                       TrailerUrl="@($"/trailer/movie/{m.Id}")"
+                       WatchUrl="@($"/watch/movie/{m.Id}")" />
+        </div>;
+}
