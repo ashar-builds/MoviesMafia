@@ -2,19 +2,30 @@
 // Loaded synchronously in App.razor BEFORE the deferred Alpine bundle.
 document.addEventListener('alpine:init', () => {
     // Auto-rotating hero carousel.
+    // Visibility is driven purely by `active`; the .razor binds opacity from it.
     Alpine.data('heroCarousel', (count) => ({
         active: 0,
         count: count,
         paused: false,
         _timer: null,
         init() {
+            this._start();
+        },
+        destroy() {
+            this._stop();
+        },
+        _start() {
+            this._stop();
             if (this.count <= 1) return;
             this._timer = setInterval(() => {
                 if (!this.paused) this.next();
             }, 6000);
         },
-        destroy() {
-            if (this._timer) clearInterval(this._timer);
+        _stop() {
+            if (this._timer) {
+                clearInterval(this._timer);
+                this._timer = null;
+            }
         },
         next() {
             this.active = (this.active + 1) % this.count;
@@ -28,6 +39,63 @@ document.addEventListener('alpine:init', () => {
         }
     }));
 
+    // Recent searches — persists the last few queries in localStorage.
+    // Lives on the page (outside the reactive component) so it survives the
+    // Idiomorph DOM swaps that happen on every search dispatch.
+    Alpine.data('recentSearches', () => ({
+        items: [],
+        _key: 'mm.recentSearches',
+        _max: 6,
+        _settleTimer: null,
+        init() {
+            this.items = this._load();
+            // After each reactive morph, record the *settled* query — wait for
+            // typing to stop so prefixes ("bat", "batm") don't get stored.
+            this.$root.addEventListener('reactive:updated', () => this._scheduleRecord());
+        },
+        _scheduleRecord() {
+            clearTimeout(this._settleTimer);
+            this._settleTimer = setTimeout(() => this._record(), 1200);
+        },
+        _record() {
+            const input = this.$root.querySelector('[data-bind="Query"]');
+            const q = input?.value.trim();
+            if (!q) return;
+            // Move-to-front, dedupe (case-insensitive), cap at _max.
+            const lower = q.toLowerCase();
+            this.items = [q, ...this.items.filter((x) => x.toLowerCase() !== lower)].slice(0, this._max);
+            this._save();
+        },
+        apply(q) {
+            const input = this.$root.querySelector('[data-bind="Query"]');
+            if (!input) return;
+            input.value = q;
+            // Trigger ReactiveBlazor's delegated input handler so it searches.
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.focus();
+        },
+        clearAll() {
+            this.items = [];
+            this._save();
+        },
+        _load() {
+            try {
+                const raw = localStorage.getItem(this._key);
+                const parsed = raw ? JSON.parse(raw) : [];
+                return Array.isArray(parsed) ? parsed.slice(0, this._max) : [];
+            } catch {
+                return [];
+            }
+        },
+        _save() {
+            try {
+                localStorage.setItem(this._key, JSON.stringify(this.items));
+            } catch {
+                /* storage unavailable (private mode / quota) — non-fatal */
+            }
+        }
+    }));
+
     // Horizontal scroll helper for media rows.
     Alpine.data('rowScroller', () => ({
         scroll(dir) {
@@ -36,4 +104,123 @@ document.addEventListener('alpine:init', () => {
             el.scrollBy({ left: dir * el.clientWidth * 0.9, behavior: 'smooth' });
         }
     }));
+});
+
+// ---------------------------------------------------------------------------
+// Top navigation progress bar.
+// Bracketed by Blazor's own enhanced-navigation lifecycle events:
+//   enhancednavigationstart -> begin           (fires once when nav starts)
+//   enhancednavigationend   -> complete         (fires once when nav settles)
+// We deliberately do NOT use `enhancedload` for completion: it fires multiple
+// times per navigation (once per streaming-render update), which previously
+// caused the bar to finish, reset, and restart mid-load.
+// ---------------------------------------------------------------------------
+const navProgress = (() => {
+    let trickle = null;
+    let done = null;
+    let progress = 0;
+    let active = false;
+
+    const bar = () => document.getElementById('nav-progress');
+
+    function set(value) {
+        const el = bar();
+        if (!el) return;
+        progress = Math.min(value, 1);
+        el.style.opacity = '1';
+        el.style.transition = 'transform 200ms ease-out, opacity 200ms ease-out';
+        el.style.transform = `scaleX(${progress})`;
+    }
+
+    function start() {
+        const el = bar();
+        if (!el) return;
+        if (active) return;
+        active = true;
+        progress = 0;
+
+        // Snap to 0 width with no transition, then ease forward.
+        el.style.transition = 'none';
+        el.style.transform = 'scaleX(0)';
+        el.style.opacity = '1';
+        // Force reflow so the snap-to-0 takes effect before we animate.
+        void el.offsetWidth;
+
+        set(0.1);
+        clearInterval(trickle);
+        clearTimeout(done);
+        trickle = setInterval(() => {
+            // Creep toward — but never reach — completion.
+            if (progress < 0.9) set(progress + (0.9 - progress) * 0.15);
+        }, 300);
+    }
+
+    function complete() {
+        const el = bar();
+        if (!el) return;
+        if (!active) return;
+        active = false;
+        clearInterval(trickle);
+        set(1);
+        done = setTimeout(() => {
+            el.style.transition = 'opacity 300ms ease-out';
+            el.style.opacity = '0';
+            // Reset width after it has faded out, ready for the next run.
+            setTimeout(() => {
+                if (!active) {
+                    el.style.transition = 'none';
+                    el.style.transform = 'scaleX(0)';
+                }
+            }, 300);
+        }, 200);
+    }
+
+    return { start, complete };
+})();
+
+// This file is loaded synchronously in <head> (so the alpine:init factories
+// above are registered before Alpine boots), but blazor.web.js loads at the
+// end of <body>. So the `Blazor` global doesn't exist when this script runs —
+// we must wait for it before wiring up any Blazor.addEventListener handlers.
+function whenBlazorReady(callback) {
+    if (typeof Blazor !== 'undefined') {
+        callback();
+        return;
+    }
+    const poll = setInterval(() => {
+        if (typeof Blazor !== 'undefined') {
+            clearInterval(poll);
+            callback();
+        }
+    }, 50);
+}
+
+whenBlazorReady(() => {
+    // Drive the bar from Blazor's enhanced-navigation lifecycle.
+    Blazor.addEventListener('enhancednavigationstart', () => navProgress.start());
+    Blazor.addEventListener('enhancednavigationend', () => navProgress.complete());
+
+    // Blazor Enhanced Navigation morphs the DOM in place. Alpine only scans for
+    // `x-data` on its initial boot, so components inserted by a page swap arrive
+    // "dead", and components carried over from the previous page keep their old
+    // state (and timers). After each enhanced load we walk every TOP-LEVEL x-data
+    // root: tear down any live instance (clears its interval), then (re)initialize.
+    //
+    // We only touch top-level roots — Alpine.initTree / destroyTree recurse into
+    // nested x-data on their own, so handling children here would double-process.
+    Blazor.addEventListener('enhancedload', () => {
+        if (typeof Alpine === 'undefined') return;
+
+        const roots = Array.from(document.querySelectorAll('[x-data]')).filter(
+            (el) => !el.parentElement?.closest('[x-data]')
+        );
+
+        for (const root of roots) {
+            // _x_dataStack is set by Alpine once a node has been initialized.
+            if (root._x_dataStack) {
+                Alpine.destroyTree(root);
+            }
+            Alpine.initTree(root);
+        }
+    });
 });

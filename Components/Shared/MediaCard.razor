@@ -16,6 +16,11 @@
             <RatingBadge Score="Score" />
         </div>
 
+        @if (!string.IsNullOrWhiteSpace(Badge))
+        {
+            <span class="chip absolute left-2 top-2 bg-ink/70 backdrop-blur">@Badge</span>
+        }
+
         @* Hover overlay: gradient + overview + action buttons. *@
         <div class="absolute inset-0 flex flex-col justify-end gap-3 bg-gradient-to-t from-ink via-ink/80 to-transparent p-3 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
             @if (!string.IsNullOrWhiteSpace(Overview))
@@ -44,6 +49,7 @@
     [Parameter] public string? Overview { get; set; }
     [Parameter] public string? Year { get; set; }
     [Parameter] public double Score { get; set; }
+    [Parameter] public string? Badge { get; set; }
     [Parameter, EditorRequired] public string TrailerUrl { get; set; } = "";
     [Parameter, EditorRequired] public string WatchUrl { get; set; } = "";
 }

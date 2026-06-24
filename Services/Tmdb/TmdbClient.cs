@@ -32,6 +32,9 @@ public sealed class TmdbClient : ITmdbClient
     public Task<MoviePage> DiscoverMoviesAsync(int page = 1, CancellationToken ct = default) =>
         GetAsync<MoviePage>("discover/movie", new() { ["sort_by"] = "popularity.desc", ["page"] = page.ToString() }, ct);
 
+    public Task<MoviePage> DiscoverMoviesAsync(DiscoverFilter filter, int page = 1, CancellationToken ct = default) =>
+        GetAsync<MoviePage>("discover/movie", BuildDiscoverQuery(filter, page, yearParam: "primary_release_year"), ct);
+
     public Task<MoviePage> SearchMoviesAsync(string query, int page = 1, CancellationToken ct = default) =>
         GetAsync<MoviePage>("search/movie", new() { ["query"] = query, ["page"] = page.ToString() }, ct);
 
@@ -40,6 +43,9 @@ public sealed class TmdbClient : ITmdbClient
 
     public Task<SeriesPage> DiscoverSeriesAsync(int page = 1, CancellationToken ct = default) =>
         GetAsync<SeriesPage>("discover/tv", new() { ["sort_by"] = "popularity.desc", ["page"] = page.ToString() }, ct);
+
+    public Task<SeriesPage> DiscoverSeriesAsync(DiscoverFilter filter, int page = 1, CancellationToken ct = default) =>
+        GetAsync<SeriesPage>("discover/tv", BuildDiscoverQuery(filter, page, yearParam: "first_air_date_year"), ct);
 
     public Task<SeriesPage> SearchSeriesAsync(string query, int page = 1, CancellationToken ct = default) =>
         GetAsync<SeriesPage>("search/tv", new() { ["query"] = query, ["page"] = page.ToString() }, ct);
@@ -104,6 +110,33 @@ public sealed class TmdbClient : ITmdbClient
         }
 
         return $"{_options.ImageBaseUrl.TrimEnd('/')}/{size}{path}";
+    }
+
+    /// <summary>
+    /// Translates a <see cref="DiscoverFilter"/> into TMDB discover query params. The year parameter
+    /// name differs between movies (<c>primary_release_year</c>) and series (<c>first_air_date_year</c>),
+    /// so the caller passes the right one.
+    /// </summary>
+    private static Dictionary<string, string?> BuildDiscoverQuery(DiscoverFilter filter, int page, string yearParam)
+    {
+        var query = new Dictionary<string, string?>
+        {
+            ["sort_by"] = string.IsNullOrWhiteSpace(filter.SortBy) ? "popularity.desc" : filter.SortBy,
+            ["page"] = page.ToString(),
+            ["vote_count.gte"] = filter.MinVotes.ToString(),
+        };
+
+        if (filter.Year is { } year)
+        {
+            query[yearParam] = year.ToString();
+        }
+
+        if (filter.MinRating is { } minRating && minRating > 0)
+        {
+            query["vote_average.gte"] = minRating.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        return query;
     }
 
     private async Task<T> GetAsync<T>(string path, Dictionary<string, string?> query, CancellationToken ct)

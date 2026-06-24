@@ -6,10 +6,12 @@ namespace MoviesMafia.Services.Tmdb;
 public interface ITmdbClient
 {
     Task<MoviePage> DiscoverMoviesAsync(int page = 1, CancellationToken ct = default);
+    Task<MoviePage> DiscoverMoviesAsync(DiscoverFilter filter, int page = 1, CancellationToken ct = default);
     Task<MoviePage> SearchMoviesAsync(string query, int page = 1, CancellationToken ct = default);
     Task<VideoPage> GetMovieVideosAsync(int movieId, CancellationToken ct = default);
 
     Task<SeriesPage> DiscoverSeriesAsync(int page = 1, CancellationToken ct = default);
+    Task<SeriesPage> DiscoverSeriesAsync(DiscoverFilter filter, int page = 1, CancellationToken ct = default);
     Task<SeriesPage> SearchSeriesAsync(string query, int page = 1, CancellationToken ct = default);
     Task<VideoPage> GetSeriesVideosAsync(int seriesId, CancellationToken ct = default);
     Task<SeriesDetails?> GetSeriesDetailsAsync(int seriesId, CancellationToken ct = default);

@@ -1,121 +1,353 @@
 @inherits ReactiveBlazor.ReactiveComponent
 @using MoviesMafia.Domain.Enums
 @using MoviesMafia.Services.Tmdb
+@using MoviesMafia.Services.Tmdb.Dtos
 @inject ITmdbClient Tmdb
 
-@* Live search with debounced input and a Movie/Series toggle — all state lives server-side. *@
+@*
+    Industry-standard search experience, fully server-driven via ReactiveBlazor.
+
+      • All / Movies / Series scope tabs (All searches both and merges).
+      • Sort (relevance, rating, newest), year, and minimum-rating filters.
+      • "Load more" pagination — pages 1..Page are refetched each dispatch
+        because component state is reconstructed from its token, not stored.
+      • Discovery empty-state: with no query we browse via the discover endpoint
+        (server-side sort/filter); with a query we search then filter client-side.
+
+    Note: everything reactive lives inside the single <ReactiveRoot> element and
+    is intentionally Alpine-free — Idiomorph morphs this subtree on every dispatch
+    and would not re-init Alpine here. Recent-searches (Alpine + localStorage)
+    lives in the page wrapper instead and listens for the bubbled `reactive:searched`.
+*@
 <ReactiveRoot Owner="this">
-    <div>
+    <div data-search-root>
+        @* ---- Query + scope ---- *@
         <div class="flex flex-col gap-3 sm:flex-row">
-            <input class="input flex-1"
-                   placeholder="Search movies and series…"
-                   data-bind="Query"
-                   data-on-input="Search"
-                   data-debounce="350"
-                   value="@Query" />
+            <div class="relative flex-1">
+                <svg xmlns="http://www.w3.org/2000/svg" class="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+                </svg>
+                <input class="input pl-10"
+                       placeholder="Search movies and series…"
+                       autocomplete="off"
+                       data-bind="Query"
+                       data-on-input="Search"
+                       data-debounce="350"
+                       value="@Query" />
+            </div>
             <div class="flex gap-2">
-                <button type="button"
-                        class="@ToggleClass(MediaType.Movie)"
-                        data-on-click="SetMovies">Movies</button>
-                <button type="button"
-                        class="@ToggleClass(MediaType.Series)"
-                        data-on-click="SetSeries">Series</button>
+                <button type="button" class="@ScopeClass(SearchScope.All)" data-on-click="SetAll">All</button>
+                <button type="button" class="@ScopeClass(SearchScope.Movies)" data-on-click="SetMovies">Movies</button>
+                <button type="button" class="@ScopeClass(SearchScope.Series)" data-on-click="SetSeries">Series</button>
             </div>
         </div>
 
-        <div class="mt-6">
-            @if (_searched && Results.Count == 0)
-            {
-                <p class="text-on-surface-variant">No @TypeLabel found for “@Query”.</p>
-            }
-            else if (Results.Count > 0)
-            {
-                <p class="mb-3 text-sm text-on-surface-variant">@Results.Count result(s) for “@Query”.</p>
-                <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
-                    @foreach (var r in Results)
+        @* ---- Filters ---- *@
+        <div class="mt-4 flex flex-wrap items-end gap-4">
+            <div>
+                <label class="label">Sort by</label>
+                <select class="input w-auto" data-bind="Sort" data-on-change="ApplyFilters">
+                    <option value="relevance" selected="@(Sort == "relevance")">Relevance</option>
+                    <option value="rating" selected="@(Sort == "rating")">Top rated</option>
+                    <option value="newest" selected="@(Sort == "newest")">Newest</option>
+                    <option value="oldest" selected="@(Sort == "oldest")">Oldest</option>
+                </select>
+            </div>
+            <div>
+                <label class="label">Year</label>
+                <select class="input w-auto" data-bind="Year" data-on-change="ApplyFilters">
+                    <option value="" selected="@(Year is null)">Any</option>
+                    @foreach (var y in YearOptions)
                     {
-                        <MediaCard Title="@r.Title"
-                                   PosterUrl="@r.PosterUrl"
-                                   Overview="@r.Overview"
-                                   Year="@r.Year"
-                                   Score="r.Score"
-                                   TrailerUrl="@r.TrailerUrl"
-                                   WatchUrl="@r.WatchUrl" />
+                        <option value="@y" selected="@(Year == y)">@y</option>
                     }
+                </select>
+            </div>
+            <div>
+                <label class="label">Min rating</label>
+                <select class="input w-auto" data-bind="MinRating" data-on-change="ApplyFilters">
+                    <option value="0" selected="@(MinRating == 0)">Any</option>
+                    <option value="5" selected="@(MinRating == 5)">5+</option>
+                    <option value="6" selected="@(MinRating == 6)">6+</option>
+                    <option value="7" selected="@(MinRating == 7)">7+</option>
+                    <option value="8" selected="@(MinRating == 8)">8+</option>
+                    <option value="9" selected="@(MinRating == 9)">9+</option>
+                </select>
+            </div>
+            @if (HasActiveFilters)
+            {
+                <button type="button" class="btn-subtle mb-0.5" data-on-click="ResetFilters">Clear filters</button>
+            }
+        </div>
+
+        @* ---- Results / discovery ---- *@
+        <div class="mt-8">
+            @if (_loadError is not null)
+            {
+                <StatusMessage IsError="true" Message="@_loadError" />
+            }
+            else if (IsBrowsing)
+            {
+                @* No query: browse/discover mode. *@
+                <p class="mb-4 text-sm text-muted">
+                    @(HasActiveFilters ? "Browsing the catalog with your filters." : "Popular right now — start typing to search, or refine with the filters above.")
+                </p>
+                @ResultsGrid()
+            }
+            else if (_results.Count == 0)
+            {
+                <div class="py-16 text-center">
+                    <p class="text-lg font-semibold text-content">No results for “@Query”.</p>
+                    <p class="mt-1 text-sm text-muted">Try a different spelling, fewer filters, or another title.</p>
                 </div>
             }
             else
             {
-                <p class="text-on-surface-variant">Start typing to search the @TypeLabel catalog.</p>
+                <p class="mb-4 text-sm text-muted">
+                    Showing @_results.Count of @_totalResults result@(_totalResults == 1 ? "" : "s") for “@Query”.
+                </p>
+                @ResultsGrid()
+            }
+
+            @if (CanLoadMore)
+            {
+                <div class="mt-10 flex justify-center">
+                    <button type="button" class="btn-ghost px-8" data-on-click="LoadMore" data-queue="all">
+                        Load more
+                    </button>
+                </div>
             }
         </div>
     </div>
 </ReactiveRoot>
 
 @code {
+    // ---- Persisted state (serialized into the token) ----
     public string Query { get; set; } = string.Empty;
-    public MediaType Type { get; set; } = MediaType.Movie;
+    public SearchScope Scope { get; set; } = SearchScope.All;
+    public string Sort { get; set; } = "relevance";
+    public int? Year { get; set; }
+    public double MinRating { get; set; }
+    public int Page { get; set; } = 1;
 
-    [ReactiveIgnore]
-    public List<SearchHit> Results { get; set; } = [];
+    // ---- Transient per-dispatch data (private fields are never serialized) ----
+    private List<SearchHit> _results = [];
+    private int _totalResults;
+    private int _totalPages;
+    private string? _loadError;
 
-    private bool _searched;
-    private string TypeLabel => Type == MediaType.Movie ? "movies" : "series";
+    private const int PageSize = 20;
+
+    private bool IsBrowsing => string.IsNullOrWhiteSpace(Query);
+    private bool HasActiveFilters => Year is not null || MinRating > 0 || Sort != "relevance";
+    private bool CanLoadMore => _loadError is null && _results.Count > 0 && Page < _totalPages;
+
+    private static IEnumerable<int> YearOptions => Enumerable.Range(1950, DateTime.UtcNow.Year - 1950 + 1).Reverse();
+
+    // Every dispatch reconstructs the component from its token, so we always
+    // (re)load before rendering. OnParametersSetAsync runs after the action has
+    // mutated state and after the initial SSR — the single place to fetch.
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
 
     [ReactiveAction]
-    public async Task Search()
+    public void Search() => Page = 1;          // query bound via data-bind; just reset paging
+
+    [ReactiveAction]
+    public void SetAll() { Scope = SearchScope.All; Page = 1; }
+
+    [ReactiveAction]
+    public void SetMovies() { Scope = SearchScope.Movies; Page = 1; }
+
+    [ReactiveAction]
+    public void SetSeries() { Scope = SearchScope.Series; Page = 1; }
+
+    [ReactiveAction]
+    public void ApplyFilters() => Page = 1;    // sort/year/min-rating bound via data-bind
+
+    [ReactiveAction]
+    public void ResetFilters()
     {
-        await RunSearchAsync();
+        Sort = "relevance";
+        Year = null;
+        MinRating = 0;
+        Page = 1;
     }
 
     [ReactiveAction]
-    public async Task SetMovies()
-    {
-        Type = MediaType.Movie;
-        await RunSearchAsync();
-    }
+    public void LoadMore() => Page++;
 
-    [ReactiveAction]
-    public async Task SetSeries()
+    private async Task LoadAsync()
     {
-        Type = MediaType.Series;
-        await RunSearchAsync();
-    }
-
-    private async Task RunSearchAsync()
-    {
-        Results = [];
-        _searched = !string.IsNullOrWhiteSpace(Query);
-        if (!_searched)
+        _loadError = null;
+        try
         {
-            return;
+            // Fetch pages 1..Page so "load more" accumulates without storing results in the token.
+            if (IsBrowsing)
+            {
+                await LoadBrowseAsync();
+            }
+            else
+            {
+                await LoadSearchAsync();
+            }
         }
-
-        if (Type == MediaType.Movie)
+        catch
         {
-            var page = await Tmdb.SearchMoviesAsync(Query);
-            Results = page.Results.Select(m => new SearchHit(
-                m.Title ?? "Untitled", Tmdb.ImageUrl(m.PosterPath), m.Overview,
-                Year(m.ReleaseDate), m.VoteAverage,
-                $"/trailer/movie/{m.Id}", $"/watch/movie/{m.Id}")).ToList();
-        }
-        else
-        {
-            var page = await Tmdb.SearchSeriesAsync(Query);
-            Results = page.Results.Select(s => new SearchHit(
-                s.Name ?? "Untitled", Tmdb.ImageUrl(s.PosterPath), s.Overview,
-                Year(s.FirstAirDate), s.VoteAverage,
-                $"/trailer/series/{s.Id}", $"/watch/series/{s.Id}")).ToList();
+            _results = [];
+            _totalResults = 0;
+            _totalPages = 0;
+            _loadError = "We couldn't run that search right now. Please try again shortly.";
         }
     }
 
-    private string ToggleClass(MediaType type) =>
-        type == Type ? "btn-primary" : "btn-ghost";
+    // ---- Browse (no query): TMDB discover, server-side sort + filter ----
+    private async Task LoadBrowseAsync()
+    {
+        var filter = new DiscoverFilter
+        {
+            SortBy = DiscoverSort(),
+            Year = Year,
+            MinRating = MinRating > 0 ? MinRating : null,
+        };
 
-    private static string? Year(string? date) =>
+        var hits = new List<SearchHit>();
+        var totalResults = 0;
+        var totalPages = 0;
+
+        for (var p = 1; p <= Page; p++)
+        {
+            if (Scope == SearchScope.Series)
+            {
+                var page = await Tmdb.DiscoverSeriesAsync(filter, p);
+                hits.AddRange(page.Results.Select(ToHit));
+                totalResults = page.TotalResults;
+                totalPages = page.TotalPages;
+            }
+            else if (Scope == SearchScope.Movies)
+            {
+                var page = await Tmdb.DiscoverMoviesAsync(filter, p);
+                hits.AddRange(page.Results.Select(ToHit));
+                totalResults = page.TotalResults;
+                totalPages = page.TotalPages;
+            }
+            else
+            {
+                // All: merge both, then sort the merged page so the mix is coherent.
+                var movies = await Tmdb.DiscoverMoviesAsync(filter, p);
+                var series = await Tmdb.DiscoverSeriesAsync(filter, p);
+                hits.AddRange(movies.Results.Select(ToHit));
+                hits.AddRange(series.Results.Select(ToHit));
+                totalResults = movies.TotalResults + series.TotalResults;
+                totalPages = Math.Min(movies.TotalPages, series.TotalPages);
+            }
+        }
+
+        _results = Scope == SearchScope.All ? SortHits(hits) : hits;
+        _totalResults = totalResults;
+        _totalPages = totalPages;
+    }
+
+    // ---- Search (with query): TMDB search, then client-side filter + sort ----
+    private async Task LoadSearchAsync()
+    {
+        var hits = new List<SearchHit>();
+        var totalResults = 0;
+        var totalPages = 0;
+
+        for (var p = 1; p <= Page; p++)
+        {
+            if (Scope == SearchScope.Series)
+            {
+                var page = await Tmdb.SearchSeriesAsync(Query, p);
+                hits.AddRange(page.Results.Select(ToHit));
+                totalResults = page.TotalResults;
+                totalPages = page.TotalPages;
+            }
+            else if (Scope == SearchScope.Movies)
+            {
+                var page = await Tmdb.SearchMoviesAsync(Query, p);
+                hits.AddRange(page.Results.Select(ToHit));
+                totalResults = page.TotalResults;
+                totalPages = page.TotalPages;
+            }
+            else
+            {
+                var movies = await Tmdb.SearchMoviesAsync(Query, p);
+                var series = await Tmdb.SearchSeriesAsync(Query, p);
+                hits.AddRange(movies.Results.Select(ToHit));
+                hits.AddRange(series.Results.Select(ToHit));
+                totalResults = movies.TotalResults + series.TotalResults;
+                totalPages = Math.Min(movies.TotalPages, series.TotalPages);
+            }
+        }
+
+        // The search endpoint ignores year/rating/sort, so apply them here.
+        var filtered = hits.Where(PassesFilters).ToList();
+        _results = SortHits(filtered);
+        _totalResults = totalResults;
+        _totalPages = totalPages;
+    }
+
+    private bool PassesFilters(SearchHit h)
+    {
+        if (MinRating > 0 && h.Score < MinRating) return false;
+        if (Year is { } y && h.NumericYear != y) return false;
+        return true;
+    }
+
+    private List<SearchHit> SortHits(List<SearchHit> hits) => Sort switch
+    {
+        "rating" => hits.OrderByDescending(h => h.Score).ToList(),
+        "newest" => hits.OrderByDescending(h => h.NumericYear ?? int.MinValue).ToList(),
+        "oldest" => hits.OrderBy(h => h.NumericYear ?? int.MaxValue).ToList(),
+        _ => hits, // relevance: preserve TMDB order
+    };
+
+    private string DiscoverSort() => Sort switch
+    {
+        "rating" => "vote_average.desc",
+        "newest" => "primary_release_date.desc",
+        "oldest" => "primary_release_date.asc",
+        _ => "popularity.desc",
+    };
+
+    private SearchHit ToHit(MovieResult m) => new(
+        m.Id, MediaType.Movie, m.Title ?? "Untitled", Tmdb.ImageUrl(m.PosterPath),
+        m.Overview, YearOf(m.ReleaseDate), m.VoteAverage,
+        $"/trailer/movie/{m.Id}", $"/watch/movie/{m.Id}");
+
+    private SearchHit ToHit(SeriesResult s) => new(
+        s.Id, MediaType.Series, s.Name ?? "Untitled", Tmdb.ImageUrl(s.PosterPath),
+        s.Overview, YearOf(s.FirstAirDate), s.VoteAverage,
+        $"/trailer/series/{s.Id}", $"/watch/series/{s.Id}");
+
+    private RenderFragment ResultsGrid() => __builder =>
+    {
+        <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
+            @foreach (var r in _results)
+            {
+                <MediaCard Title="@r.Title"
+                           PosterUrl="@r.PosterUrl"
+                           Overview="@r.Overview"
+                           Year="@r.Year"
+                           Score="r.Score"
+                           Badge="@(Scope == SearchScope.All ? r.TypeLabel : null)"
+                           TrailerUrl="@r.TrailerUrl"
+                           WatchUrl="@r.WatchUrl" />
+            }
+        </div>
+    };
+
+    private string ScopeClass(SearchScope scope) => scope == Scope ? "btn-primary" : "btn-ghost";
+
+    private static string? YearOf(string? date) =>
         !string.IsNullOrEmpty(date) && date.Length >= 4 ? date[..4] : null;
 
     public sealed record SearchHit(
-        string Title, string? PosterUrl, string? Overview, string? Year,
-        double Score, string TrailerUrl, string WatchUrl);
+        int Id, MediaType Type, string Title, string? PosterUrl, string? Overview,
+        string? Year, double Score, string TrailerUrl, string WatchUrl)
+    {
+        public string TypeLabel => Type == MediaType.Movie ? "Movie" : "Series";
+        public int? NumericYear => int.TryParse(Year, out var y) ? y : null;
+    }
 }

@@ -1,7 +1,11 @@
 @* Top navigation. Mobile menu and the account dropdown are pure client-side state via Alpine. *@
 
-<header class="sticky top-0 z-40 border-b border-line/80 bg-ink/80 backdrop-blur-xl"
+<header class="sticky top-0 z-40 border-b border-line/80 bg-ink/80 backdrop-blur-xl relative"
         x-data="{ open: false }">
+    @* Top-loading progress bar. Driven by app.js on Blazor navigation. *@
+    <div id="nav-progress"
+         class="pointer-events-none absolute inset-x-0 bottom-0 z-50 h-0.5 origin-left bg-brand"
+         style="transform:scaleX(0);opacity:0"></div>
     <nav class="flex w-full items-center gap-4 px-4 py-3 sm:px-6 lg:px-10">
         <a href="/" class="flex shrink-0 items-center gap-2 text-lg font-extrabold tracking-tight">
             <span class="grid h-8 w-8 place-items-center rounded-lg bg-brand text-white">M</span>

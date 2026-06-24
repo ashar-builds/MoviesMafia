@@ -1,56 +1,92 @@
 @page "/series"
 @using MoviesMafia.Services.Tmdb
+@using MoviesMafia.Services.Tmdb.Dtos
 @inject ITmdbClient Tmdb
 
 <PageTitle>Series — MoviesMafia</PageTitle>
 
-<div class="w-full px-4 py-8 sm:px-6 lg:px-10">
-<header class="mb-6">
-    <h1 class="text-3xl font-bold">Popular series</h1>
-    <p class="mt-1 text-on-surface-variant">Binge-worthy shows, sorted by what everyone's watching.</p>
-</header>
+<HeroCarousel Slides="_hero" />
 
-@if (_error is not null)
-{
-    <StatusMessage IsError="true" Message="@_error" />
-}
-else
-{
-    <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
-        @foreach (var s in _page.Results)
+<div class="w-full px-4 pb-16 sm:px-6 lg:px-10">
+
+    @if (_loadError is not null)
+    {
+        <StatusMessage IsError="true" Message="@_loadError" />
+    }
+
+    <TrendingSection Kind="series" />
+
+    <MediaRow Title="Popular series" Subtitle="The shows everyone's binging">
+        @foreach (var s in _popular)
         {
-            <MediaCard Title="@(s.Name ?? "Untitled")"
-                       PosterUrl="@Tmdb.ImageUrl(s.PosterPath)"
-                       Overview="@s.Overview"
-                       Year="@Year(s.FirstAirDate)"
-                       Score="s.VoteAverage"
-                       TrailerUrl="@($"/trailer/series/{s.Id}")"
-                       WatchUrl="@($"/watch/series/{s.Id}")" />
+            @Card(s)
         }
-    </div>
+    </MediaRow>
 
-    <Pager BasePath="/series" Page="_page.Page" TotalPages="_page.TotalPages" />
-}
+    <MediaRow Title="On the air" Subtitle="Series with new episodes airing now">
+        @foreach (var s in _onTheAir)
+        {
+            @Card(s)
+        }
+    </MediaRow>
+
+    <MediaRow Title="Airing today" Subtitle="Fresh episodes in the next 24 hours">
+        @foreach (var s in _airingToday)
+        {
+            @Card(s)
+        }
+    </MediaRow>
+
+    <MediaRow Title="Top rated series" Subtitle="Binge-worthy classics">
+        @foreach (var s in _topRated)
+        {
+            @Card(s)
+        }
+    </MediaRow>
 </div>
 
 @code {
-    [SupplyParameterFromQuery] public int Page { get; set; }
+    private const int RowSize = HomeMappers.RowSize;
 
-    private Services.Tmdb.Dtos.SeriesPage _page = new();
-    private string? _error;
+    private List<HeroSlide> _hero = new();
+    private List<SeriesResult> _popular = new();
+    private List<SeriesResult> _onTheAir = new();
+    private List<SeriesResult> _airingToday = new();
+    private List<SeriesResult> _topRated = new();
+    private string? _loadError;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            _page = await Tmdb.DiscoverSeriesAsync(Page < 1 ? 1 : Page);
+            var heroTask = Tmdb.GetTrendingSeriesAsync("day");
+            var popularTask = Tmdb.GetPopularSeriesAsync();
+            var onTheAirTask = Tmdb.GetOnTheAirSeriesAsync();
+            var airingTodayTask = Tmdb.GetAiringTodaySeriesAsync();
+            var topRatedTask = Tmdb.GetTopRatedSeriesAsync();
+
+            await Task.WhenAll(heroTask, popularTask, onTheAirTask, airingTodayTask, topRatedTask);
+
+            _hero = HomeMappers.ToHeroSlides((await heroTask).Results, Tmdb, "Trending series");
+            _popular = (await popularTask).Results.Take(RowSize).ToList();
+            _onTheAir = (await onTheAirTask).Results.Take(RowSize).ToList();
+            _airingToday = (await airingTodayTask).Results.Take(RowSize).ToList();
+            _topRated = (await topRatedTask).Results.Take(RowSize).ToList();
         }
         catch
         {
-            _error = "We couldn't load series right now. Please try again shortly.";
+            _loadError = "We couldn't load series right now. Please try again shortly.";
         }
     }
 
-    private static string? Year(string? date) =>
-        !string.IsNullOrEmpty(date) && date.Length >= 4 ? date[..4] : null;
+    private RenderFragment Card(SeriesResult s) =>
+        @<div class="w-40 shrink-0 snap-start sm:w-48">
+            <MediaCard Title="@(s.Name ?? "Untitled")"
+                       PosterUrl="@Tmdb.ImageUrl(s.PosterPath)"
+                       Overview="@s.Overview"
+                       Year="@HomeMappers.Year(s.FirstAirDate)"
+                       Score="s.VoteAverage"
+                       TrailerUrl="@($"/trailer/series/{s.Id}")"
+                       WatchUrl="@($"/watch/series/{s.Id}")" />
+        </div>;
 }

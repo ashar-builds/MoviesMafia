@@ -6,7 +6,7 @@
 <PageTitle>MoviesMafia — Stream the classics</PageTitle>
 
 @* Hero is full-bleed (no padding around it). *@
-<HeroCarousel />
+<HeroCarousel Slides="_hero" />
 
 @* Everything else uses the immersive full-width canvas with breathing room. *@
 <div class="w-full px-4 pb-16 sm:px-6 lg:px-10">
@@ -58,8 +58,9 @@
 </div>
 
 @code {
-    private const int RowSize = 18;
+    private const int RowSize = HomeMappers.RowSize;
 
+    private List<HeroSlide> _hero = new();
     private List<MovieResult> _nowPlaying = new();
     private List<MovieResult> _topRatedMovies = new();
     private List<MovieResult> _upcoming = new();
@@ -71,14 +72,16 @@
     {
         try
         {
+            var heroTask = Tmdb.GetTrendingMoviesAsync("day");
             var nowPlayingTask = Tmdb.GetNowPlayingMoviesAsync();
             var topRatedMoviesTask = Tmdb.GetTopRatedMoviesAsync();
             var upcomingTask = Tmdb.GetUpcomingMoviesAsync();
             var onTheAirTask = Tmdb.GetOnTheAirSeriesAsync();
             var topRatedSeriesTask = Tmdb.GetTopRatedSeriesAsync();
 
-            await Task.WhenAll(nowPlayingTask, topRatedMoviesTask, upcomingTask, onTheAirTask, topRatedSeriesTask);
+            await Task.WhenAll(heroTask, nowPlayingTask, topRatedMoviesTask, upcomingTask, onTheAirTask, topRatedSeriesTask);
 
+            _hero = HomeMappers.ToHeroSlides((await heroTask).Results, Tmdb);
             _nowPlaying = (await nowPlayingTask).Results.Take(RowSize).ToList();
             _topRatedMovies = (await topRatedMoviesTask).Results.Take(RowSize).ToList();
             _upcoming = (await upcomingTask).Results.Take(RowSize).ToList();
@@ -91,8 +94,7 @@
         }
     }
 
-    private static string? Year(string? date) =>
-        !string.IsNullOrEmpty(date) && date.Length >= 4 ? date[..4] : null;
+    private static string? Year(string? date) => HomeMappers.Year(date);
 
     private RenderFragment MovieCard(MovieResult m) =>
         @<div class="w-40 shrink-0 snap-start sm:w-48">

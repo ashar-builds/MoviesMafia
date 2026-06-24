@@ -1,58 +1,92 @@
 @page "/movies"
 @using MoviesMafia.Services.Tmdb
+@using MoviesMafia.Services.Tmdb.Dtos
 @inject ITmdbClient Tmdb
 
 <PageTitle>Movies — MoviesMafia</PageTitle>
 
-<div class="w-full px-4 py-8 sm:px-6 lg:px-10">
-<header class="mb-6 flex items-end justify-between gap-4">
-    <div>
-        <h1 class="text-3xl font-bold">Popular movies</h1>
-        <p class="mt-1 text-on-surface-variant">Trending titles from around the world.</p>
-    </div>
-</header>
+<HeroCarousel Slides="_hero" />
 
-@if (_error is not null)
-{
-    <StatusMessage IsError="true" Message="@_error" />
-}
-else
-{
-    <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
-        @foreach (var m in _page.Results)
+<div class="w-full px-4 pb-16 sm:px-6 lg:px-10">
+
+    @if (_loadError is not null)
+    {
+        <StatusMessage IsError="true" Message="@_loadError" />
+    }
+
+    <TrendingSection Kind="movies" />
+
+    <MediaRow Title="Popular movies" Subtitle="Loved by everyone">
+        @foreach (var m in _popular)
         {
-            <MediaCard Title="@(m.Title ?? "Untitled")"
-                       PosterUrl="@Tmdb.ImageUrl(m.PosterPath)"
-                       Overview="@m.Overview"
-                       Year="@Year(m.ReleaseDate)"
-                       Score="m.VoteAverage"
-                       TrailerUrl="@($"/trailer/movie/{m.Id}")"
-                       WatchUrl="@($"/watch/movie/{m.Id}")" />
+            @Card(m)
         }
-    </div>
+    </MediaRow>
 
-    <Pager BasePath="/movies" Page="_page.Page" TotalPages="_page.TotalPages" />
-}
+    <MediaRow Title="Now playing in theaters" Subtitle="Catch the latest releases">
+        @foreach (var m in _nowPlaying)
+        {
+            @Card(m)
+        }
+    </MediaRow>
+
+    <MediaRow Title="Top rated movies" Subtitle="The all-time greats according to TMDB">
+        @foreach (var m in _topRated)
+        {
+            @Card(m)
+        }
+    </MediaRow>
+
+    <MediaRow Title="Upcoming movies" Subtitle="Mark your calendar">
+        @foreach (var m in _upcoming)
+        {
+            @Card(m)
+        }
+    </MediaRow>
 </div>
 
 @code {
-    [SupplyParameterFromQuery] public int Page { get; set; }
+    private const int RowSize = HomeMappers.RowSize;
 
-    private Services.Tmdb.Dtos.MoviePage _page = new();
-    private string? _error;
+    private List<HeroSlide> _hero = new();
+    private List<MovieResult> _popular = new();
+    private List<MovieResult> _nowPlaying = new();
+    private List<MovieResult> _topRated = new();
+    private List<MovieResult> _upcoming = new();
+    private string? _loadError;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            _page = await Tmdb.DiscoverMoviesAsync(Page < 1 ? 1 : Page);
+            var heroTask = Tmdb.GetTrendingMoviesAsync("day");
+            var popularTask = Tmdb.GetPopularMoviesAsync();
+            var nowPlayingTask = Tmdb.GetNowPlayingMoviesAsync();
+            var topRatedTask = Tmdb.GetTopRatedMoviesAsync();
+            var upcomingTask = Tmdb.GetUpcomingMoviesAsync();
+
+            await Task.WhenAll(heroTask, popularTask, nowPlayingTask, topRatedTask, upcomingTask);
+
+            _hero = HomeMappers.ToHeroSlides((await heroTask).Results, Tmdb, "Trending movie");
+            _popular = (await popularTask).Results.Take(RowSize).ToList();
+            _nowPlaying = (await nowPlayingTask).Results.Take(RowSize).ToList();
+            _topRated = (await topRatedTask).Results.Take(RowSize).ToList();
+            _upcoming = (await upcomingTask).Results.Take(RowSize).ToList();
         }
         catch
         {
-            _error = "We couldn't load movies right now. Please try again shortly.";
+            _loadError = "We couldn't load movies right now. Please try again shortly.";
         }
     }
 
-    private static string? Year(string? date) =>
-        !string.IsNullOrEmpty(date) && date.Length >= 4 ? date[..4] : null;
+    private RenderFragment Card(MovieResult m) =>
+        @<div class="w-40 shrink-0 snap-start sm:w-48">
+            <MediaCard Title="@(m.Title ?? "Untitled")"
+                       PosterUrl="@Tmdb.ImageUrl(m.PosterPath)"
+                       Overview="@m.Overview"
+                       Year="@HomeMappers.Year(m.ReleaseDate)"
+                       Score="m.VoteAverage"
+                       TrailerUrl="@($"/trailer/movie/{m.Id}")"
+                       WatchUrl="@($"/watch/movie/{m.Id}")" />
+        </div>;
 }

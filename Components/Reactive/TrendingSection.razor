@@ -3,13 +3,14 @@
 @using MoviesMafia.Services.Tmdb.Dtos
 @inject ITmdbClient Tmdb
 
-@* Trending movies row with Today / This Week filter. State lives server-side. *@
+@* Trending row with Today / This Week filter. Server-driven via ReactiveBlazor.
+   Kind = "movies" (default) or "series". *@
 <ReactiveRoot Owner="this">
     <section class="mt-12">
         <header class="mb-4 flex flex-wrap items-end justify-between gap-4">
             <div>
-                <h2 class="text-2xl font-bold sm:text-3xl">Trending</h2>
-                <p class="mt-1 text-sm text-on-surface-variant">What everyone is watching right now.</p>
+                <h2 class="text-2xl font-bold sm:text-3xl">Trending @KindLabel</h2>
+                <p class="mt-1 text-sm text-muted">What everyone is watching right now.</p>
             </div>
             <div class="inline-flex rounded-full border border-line bg-surface p-1 text-sm">
                 <button type="button" class="@TabClass("day")" data-on-click="SetDay">Today</button>
@@ -17,8 +18,7 @@
             </div>
         </header>
 
-        <div class="relative"
-             x-data="rowScroller">
+        <div class="relative" x-data="rowScroller">
             <button type="button" x-on:click="scroll(-1)"
                     class="absolute left-0 top-1/2 z-10 hidden -translate-x-2 -translate-y-1/2 rounded-full border border-line bg-surface/90 p-2 text-content shadow-lg backdrop-blur transition hover:bg-surface sm:flex"
                     aria-label="Scroll left">
@@ -30,20 +30,20 @@
             <div x-ref="row" class="scrollbar-hide -mx-2 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-2 pb-2">
                 @if (Items.Count == 0)
                 {
-                    <p class="px-2 py-10 text-on-surface-variant">No trending titles right now.</p>
+                    <p class="px-2 py-10 text-muted">No trending titles right now.</p>
                 }
                 else
                 {
-                    @foreach (var m in Items)
+                    @foreach (var c in Items)
                     {
                         <div class="w-40 shrink-0 snap-start sm:w-48">
-                            <MediaCard Title="@(m.Title ?? "Untitled")"
-                                       PosterUrl="@Tmdb.ImageUrl(m.PosterPath)"
-                                       Overview="@m.Overview"
-                                       Year="@Year(m.ReleaseDate)"
-                                       Score="m.VoteAverage"
-                                       TrailerUrl="@($"/trailer/movie/{m.Id}")"
-                                       WatchUrl="@($"/watch/movie/{m.Id}")" />
+                            <MediaCard Title="@c.Title"
+                                       PosterUrl="@c.PosterUrl"
+                                       Overview="@c.Overview"
+                                       Year="@c.Year"
+                                       Score="c.Score"
+                                       TrailerUrl="@c.TrailerUrl"
+                                       WatchUrl="@c.WatchUrl" />
                         </div>
                     }
                 }
@@ -56,31 +56,57 @@
                     <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
                 </svg>
             </button>
-
         </div>
     </section>
 </ReactiveRoot>
 
 @code {
+    [Parameter] public string Kind { get; set; } = "movies";
+
     public string Window { get; set; } = "day";
 
     [ReactiveIgnore]
-    public List<MovieResult> Items { get; set; } = [];
+    public List<Card> Items { get; set; } = [];
+
+    private bool IsSeries => string.Equals(Kind, "series", StringComparison.OrdinalIgnoreCase);
+    private string KindLabel => IsSeries ? "series" : "movies";
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
     [ReactiveAction]
-    public void SetDay() => Window = "day";
+    public Task SetDay() { Window = "day"; return LoadAsync(); }
 
     [ReactiveAction]
-    public void SetWeek() => Window = "week";
+    public Task SetWeek() { Window = "week"; return LoadAsync(); }
 
     private async Task LoadAsync()
     {
         try
         {
-            var page = await Tmdb.GetTrendingMoviesAsync(Window);
-            Items = page.Results.Take(16).ToList();
+            if (IsSeries)
+            {
+                var page = await Tmdb.GetTrendingSeriesAsync(Window);
+                Items = page.Results.Take(18).Select(s => new Card(
+                    s.Name ?? "Untitled",
+                    Tmdb.ImageUrl(s.PosterPath),
+                    s.Overview,
+                    Year(s.FirstAirDate),
+                    s.VoteAverage,
+                    $"/trailer/series/{s.Id}",
+                    $"/watch/series/{s.Id}")).ToList();
+            }
+            else
+            {
+                var page = await Tmdb.GetTrendingMoviesAsync(Window);
+                Items = page.Results.Take(18).Select(m => new Card(
+                    m.Title ?? "Untitled",
+                    Tmdb.ImageUrl(m.PosterPath),
+                    m.Overview,
+                    Year(m.ReleaseDate),
+                    m.VoteAverage,
+                    $"/trailer/movie/{m.Id}",
+                    $"/watch/movie/{m.Id}")).ToList();
+            }
         }
         catch
         {
@@ -90,9 +116,13 @@
 
     private string TabClass(string value) =>
         Window == value
-            ? "rounded-full px-4 py-1.5 font-semibold transition bg-brand text-on-brand"
-            : "rounded-full px-4 py-1.5 font-semibold transition text-on-surface-variant hover:text-on-surface";
+            ? "rounded-full px-4 py-1.5 font-semibold transition bg-brand text-white"
+            : "rounded-full px-4 py-1.5 font-semibold transition text-muted hover:text-content";
 
     private static string? Year(string? date) =>
         !string.IsNullOrEmpty(date) && date.Length >= 4 ? date[..4] : null;
+
+    public sealed record Card(
+        string Title, string? PosterUrl, string? Overview, string? Year,
+        double Score, string TrailerUrl, string WatchUrl);
 }
