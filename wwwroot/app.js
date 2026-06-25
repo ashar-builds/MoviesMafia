@@ -197,7 +197,17 @@ function whenBlazorReady(callback) {
 
 whenBlazorReady(() => {
     // Drive the bar from Blazor's enhanced-navigation lifecycle.
-    Blazor.addEventListener('enhancednavigationstart', () => navProgress.start());
+    Blazor.addEventListener('enhancednavigationstart', () => {
+        navProgress.start();
+        // The nav header lives in the persistent layout, so its Alpine `open`
+        // state survives navigation. Force the mobile dropdown closed whenever a
+        // navigation begins — otherwise it stays open after tapping a link, and a
+        // morph could even leave it open on the next page.
+        const header = document.querySelector('[data-nav-header]');
+        if (header?._x_dataStack) {
+            Alpine.evaluate(header, 'open = false');
+        }
+    });
     Blazor.addEventListener('enhancednavigationend', () => navProgress.complete());
 
     // Blazor Enhanced Navigation morphs the DOM in place. Alpine only scans for

@@ -1,6 +1,7 @@
 @* Top navigation. Mobile menu and the account dropdown are pure client-side state via Alpine. *@
 
-<header class="sticky top-0 z-40 border-b border-line/80 bg-ink/80 backdrop-blur-xl relative"
+<header data-nav-header
+        class="sticky top-0 z-40 border-b border-line/80 bg-ink/80 backdrop-blur-xl relative"
         x-data="{ open: false }">
     @* Top-loading progress bar. Driven by app.js on Blazor navigation. *@
     <div id="nav-progress"
@@ -48,9 +49,12 @@
         </button>
     </nav>
 
-    @* Absolute so the open menu overlays the hero instead of pushing it down. *@
+    @* Absolute so the open menu overlays the hero instead of pushing it down.
+       style="display:none" is server-rendered so an enhanced-navigation morph keeps
+       the menu closed: Idiomorph would otherwise strip the runtime display:none Alpine
+       adds (incoming server HTML lacks it), leaving the menu visible on the new page. *@
     <div class="absolute inset-x-0 top-full z-40 border-b border-line/80 bg-ink/95 backdrop-blur-xl md:hidden"
-         x-show="open" x-cloak x-transition>
+         x-show="open" x-cloak x-transition style="display:none">
         <div class="space-y-1 px-4 py-3">
             <a href="movies" class="block rounded-lg px-3 py-2 text-sm text-content hover:bg-surface-2">Movies</a>
             <a href="series" class="block rounded-lg px-3 py-2 text-sm text-content hover:bg-surface-2">Series</a>
