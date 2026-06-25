@@ -43,14 +43,12 @@
                                        Year="@c.Year"
                                        Score="c.Score"
                                        TrailerUrl="@c.TrailerUrl"
-                                       WatchUrl="@c.WatchUrl" />
+                                       WatchUrl="@c.WatchUrl"
+                                       DetailsUrl="@c.DetailsUrl" />
                         </div>
                     }
                 }
             </div>
-
-            @* Subtle right-edge fade so a partially-peeked card hints at more content. *@
-            <div class="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-ink to-transparent sm:w-12"></div>
 
             <button type="button" x-on:click="scroll(1)"
                     class="absolute right-0 top-1/2 z-10 hidden translate-x-2 -translate-y-1/2 rounded-full border border-line bg-surface/90 p-2 text-content shadow-lg backdrop-blur transition hover:bg-surface sm:flex"
@@ -96,7 +94,8 @@
                     Year(s.FirstAirDate),
                     s.VoteAverage,
                     $"/trailer/series/{s.Id}",
-                    $"/watch/series/{s.Id}")).ToList();
+                    $"/watch/series/{s.Id}",
+                    $"/details/series/{s.Id}")).ToList();
             }
             else
             {
@@ -108,7 +107,8 @@
                     Year(m.ReleaseDate),
                     m.VoteAverage,
                     $"/trailer/movie/{m.Id}",
-                    $"/watch/movie/{m.Id}")).ToList();
+                    $"/watch/movie/{m.Id}",
+                    $"/details/movie/{m.Id}")).ToList();
             }
         }
         catch
@@ -127,5 +127,5 @@
 
     public sealed record Card(
         string Title, string? PosterUrl, string? Overview, string? Year,
-        double Score, string TrailerUrl, string WatchUrl);
+        double Score, string TrailerUrl, string WatchUrl, string DetailsUrl);
 }

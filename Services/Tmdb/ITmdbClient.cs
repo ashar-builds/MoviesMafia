@@ -16,6 +16,12 @@ public interface ITmdbClient
     Task<VideoPage> GetSeriesVideosAsync(int seriesId, CancellationToken ct = default);
     Task<SeriesDetails?> GetSeriesDetailsAsync(int seriesId, CancellationToken ct = default);
 
+    Task<MovieDetails?> GetMovieDetailsAsync(int movieId, CancellationToken ct = default);
+    Task<CreditsResponse?> GetMovieCreditsAsync(int movieId, CancellationToken ct = default);
+    Task<CreditsResponse?> GetSeriesCreditsAsync(int seriesId, CancellationToken ct = default);
+    Task<MoviePage> GetMovieRecommendationsAsync(int movieId, int page = 1, CancellationToken ct = default);
+    Task<SeriesPage> GetSeriesRecommendationsAsync(int seriesId, int page = 1, CancellationToken ct = default);
+
     /// <summary>Trending movies for the given window ("day" or "week").</summary>
     Task<MoviePage> GetTrendingMoviesAsync(string window = "day", int page = 1, CancellationToken ct = default);
 

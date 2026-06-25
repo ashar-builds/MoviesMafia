@@ -104,7 +104,8 @@
                        Year="@Year(m.ReleaseDate)"
                        Score="m.VoteAverage"
                        TrailerUrl="@($"/trailer/movie/{m.Id}")"
-                       WatchUrl="@($"/watch/movie/{m.Id}")" />
+                       WatchUrl="@($"/watch/movie/{m.Id}")"
+                       DetailsUrl="@($"/details/movie/{m.Id}")" />
         </div>;
 
     private RenderFragment SeriesCard(SeriesResult s) =>
@@ -115,6 +116,7 @@
                        Year="@Year(s.FirstAirDate)"
                        Score="s.VoteAverage"
                        TrailerUrl="@($"/trailer/series/{s.Id}")"
-                       WatchUrl="@($"/watch/series/{s.Id}")" />
+                       WatchUrl="@($"/watch/series/{s.Id}")"
+                       DetailsUrl="@($"/details/series/{s.Id}")" />
         </div>;
 }

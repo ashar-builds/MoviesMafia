@@ -28,10 +28,6 @@
             @ChildContent
         </div>
 
-        @* Subtle right-edge fade so a partially-peeked card reads as "more to scroll"
-           rather than a hard clip. Pointer-events-none keeps the cards tappable. *@
-        <div class="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-ink to-transparent sm:w-12"></div>
-
         <button type="button" x-on:click="scroll(1)"
                 class="absolute right-0 top-1/2 z-10 hidden translate-x-2 -translate-y-1/2 rounded-full border border-line bg-surface/90 p-2 text-content shadow-lg backdrop-blur transition hover:bg-surface sm:flex"
                 aria-label="Scroll right">
