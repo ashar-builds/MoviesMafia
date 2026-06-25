@@ -6,7 +6,7 @@
 @* Trending row with Today / This Week filter. Server-driven via ReactiveBlazor.
    Kind = "movies" (default) or "series". *@
 <ReactiveRoot Owner="this">
-    <section class="mt-12">
+    <section class="mt-14 sm:mt-16">
         <header class="mb-4 flex flex-wrap items-end justify-between gap-4">
             <div>
                 <h2 class="text-2xl font-bold sm:text-3xl">Trending @KindLabel</h2>
@@ -36,7 +36,7 @@
                 {
                     @foreach (var c in Items)
                     {
-                        <div class="w-40 shrink-0 snap-start sm:w-48">
+                        <div class="w-44 shrink-0 snap-start sm:w-52">
                             <MediaCard Title="@c.Title"
                                        PosterUrl="@c.PosterUrl"
                                        Overview="@c.Overview"
@@ -48,6 +48,9 @@
                     }
                 }
             </div>
+
+            @* Subtle right-edge fade so a partially-peeked card hints at more content. *@
+            <div class="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-ink to-transparent sm:w-12"></div>
 
             <button type="button" x-on:click="scroll(1)"
                     class="absolute right-0 top-1/2 z-10 hidden translate-x-2 -translate-y-1/2 rounded-full border border-line bg-surface/90 p-2 text-content shadow-lg backdrop-blur transition hover:bg-surface sm:flex"
@@ -117,7 +120,7 @@
     private string TabClass(string value) =>
         Window == value
             ? "rounded-full px-4 py-1.5 font-semibold transition bg-brand text-white"
-            : "rounded-full px-4 py-1.5 font-semibold transition text-muted hover:text-content";
+            : "rounded-full px-4 py-1.5 font-semibold transition text-content/70 hover:text-content hover:bg-surface-2/60";
 
     private static string? Year(string? date) =>
         !string.IsNullOrEmpty(date) && date.Length >= 4 ? date[..4] : null;

@@ -29,18 +29,27 @@
             {
                 <p class="hidden line-clamp-4 text-xs text-content/90 sm:block">@Overview</p>
             }
+            @* whitespace-nowrap + min-w-0 prevents the play glyph from wrapping below
+               the label on narrow cards (e.g. the 160px home-row cards). *@
             <div class="flex gap-2">
-                <a href="@TrailerUrl" class="btn-ghost flex-1 px-2 py-2 text-xs sm:py-1.5">Trailer</a>
-                <a href="@WatchUrl" class="btn-primary flex-1 px-2 py-2 text-xs sm:py-1.5">▶ Watch</a>
+                <a href="@TrailerUrl" class="btn-ghost min-w-0 flex-1 whitespace-nowrap px-2 py-2 text-xs sm:py-1.5">Trailer</a>
+                <a href="@WatchUrl" class="btn-primary min-w-0 flex-1 whitespace-nowrap px-2 py-2 text-xs sm:py-1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path d="M6 4.5v11a.5.5 0 0 0 .77.42l9-5.5a.5.5 0 0 0 0-.84l-9-5.5A.5.5 0 0 0 6 4.5z" />
+                    </svg>
+                    <span>Watch</span>
+                </a>
             </div>
         </div>
     </div>
 
+    @* line-clamp-2 with min-height keeps card heights uniform while letting longer
+       titles wrap to a second line instead of being mid-word truncated. *@
     <div class="p-3">
-        <h3 class="truncate text-sm font-semibold" title="@Title">@Title</h3>
+        <h3 class="line-clamp-2 min-h-[2.5rem] text-sm font-semibold leading-tight" title="@Title">@Title</h3>
         @if (!string.IsNullOrWhiteSpace(Year))
         {
-            <p class="text-xs text-muted">@Year</p>
+            <p class="mt-1 text-xs text-muted">@Year</p>
         }
     </div>
 </div>

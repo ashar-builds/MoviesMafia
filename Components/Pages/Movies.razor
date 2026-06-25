@@ -80,7 +80,7 @@
     }
 
     private RenderFragment Card(MovieResult m) =>
-        @<div class="w-40 shrink-0 snap-start sm:w-48">
+        @<div class="w-44 shrink-0 snap-start sm:w-52">
             <MediaCard Title="@(m.Title ?? "Untitled")"
                        PosterUrl="@Tmdb.ImageUrl(m.PosterPath)"
                        Overview="@m.Overview"

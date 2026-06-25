@@ -1,6 +1,6 @@
 @* Horizontally scrolling row of MediaCards. Used by the home page sections. *@
 
-<section class="mt-12">
+<section class="mt-14 sm:mt-16">
     <header class="mb-4 flex items-end justify-between gap-4">
         <div>
             <h2 class="text-2xl font-bold sm:text-3xl">@Title</h2>
@@ -27,6 +27,10 @@
         <div x-ref="row" class="scrollbar-hide -mx-2 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-2 pb-2">
             @ChildContent
         </div>
+
+        @* Subtle right-edge fade so a partially-peeked card reads as "more to scroll"
+           rather than a hard clip. Pointer-events-none keeps the cards tappable. *@
+        <div class="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-ink to-transparent sm:w-12"></div>
 
         <button type="button" x-on:click="scroll(1)"
                 class="absolute right-0 top-1/2 z-10 hidden translate-x-2 -translate-y-1/2 rounded-full border border-line bg-surface/90 p-2 text-content shadow-lg backdrop-blur transition hover:bg-surface sm:flex"

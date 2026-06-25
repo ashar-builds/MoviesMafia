@@ -44,18 +44,18 @@
 
         @* ---- Filters ---- *@
         <div class="mt-4 flex flex-wrap items-end gap-3 sm:gap-4">
-            <div class="min-w-[8rem] flex-1 sm:flex-none">
+            <div class="flex-1 sm:flex-none">
                 <label class="label">Sort by</label>
-                <select class="input w-full sm:w-auto" data-bind="Sort" data-on-change="ApplyFilters">
+                <select class="select w-full sm:w-44" data-bind="Sort" data-on-change="ApplyFilters">
                     <option value="relevance" selected="@(Sort == "relevance")">Relevance</option>
                     <option value="rating" selected="@(Sort == "rating")">Top rated</option>
                     <option value="newest" selected="@(Sort == "newest")">Newest</option>
                     <option value="oldest" selected="@(Sort == "oldest")">Oldest</option>
                 </select>
             </div>
-            <div class="min-w-[8rem] flex-1 sm:flex-none">
+            <div class="flex-1 sm:flex-none">
                 <label class="label">Year</label>
-                <select class="input w-full sm:w-auto" data-bind="Year" data-on-change="ApplyFilters">
+                <select class="select w-full sm:w-32" data-bind="Year" data-on-change="ApplyFilters">
                     <option value="" selected="@(Year is null)">Any</option>
                     @foreach (var y in YearOptions)
                     {
@@ -63,9 +63,9 @@
                     }
                 </select>
             </div>
-            <div class="min-w-[8rem] flex-1 sm:flex-none">
+            <div class="flex-1 sm:flex-none">
                 <label class="label">Min rating</label>
-                <select class="input w-full sm:w-auto" data-bind="MinRating" data-on-change="ApplyFilters">
+                <select class="select w-full sm:w-32" data-bind="MinRating" data-on-change="ApplyFilters">
                     <option value="0" selected="@(MinRating == 0)">Any</option>
                     <option value="5" selected="@(MinRating == 5)">5+</option>
                     <option value="6" selected="@(MinRating == 6)">6+</option>
