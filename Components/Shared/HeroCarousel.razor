@@ -21,12 +21,13 @@
             {
                 var slide = Slides[i];
                 var idx = i;
-                @* Server-render slide 0 visible so there is no flash before
-                   Alpine boots; x-bind:style takes over immediately after. *@
+                @* Backdrop layer: every slide stays mounted and crossfades via opacity.
+                   Server-render slide 0 visible so there is no flash before Alpine boots;
+                   x-bind:style takes over immediately after. *@
                 <div class="absolute inset-0 transition-opacity duration-700 ease-in-out"
-                     style="@(idx == 0 ? "opacity:1;z-index:10" : "opacity:0;z-index:0;pointer-events:none")"
+                     style="@(idx == 0 ? "opacity:1;z-index:5" : "opacity:0;z-index:0;pointer-events:none")"
                      x-bind:style="active === @idx
-                         ? 'opacity:1;z-index:10'
+                         ? 'opacity:1;z-index:5'
                          : 'opacity:0;z-index:0;pointer-events:none'">
 
                     @if (slide.BackdropUrl is not null)
@@ -35,30 +36,46 @@
                              class="absolute inset-0 h-full w-full object-cover"
                              loading="@(idx == 0 ? "eager" : "lazy")" />
                     }
-                    <div class="absolute inset-0 bg-gradient-to-t from-ink via-ink/70 to-transparent"></div>
-                    <div class="absolute inset-0 bg-gradient-to-r from-ink via-ink/60 to-transparent"></div>
+                    @* Stronger bottom gradient so the text block always sits on a near-solid base. *@
+                    <div class="absolute inset-0 bg-gradient-to-t from-ink via-ink/85 to-transparent"></div>
+                    <div class="absolute inset-0 bg-gradient-to-r from-ink/90 via-ink/50 to-transparent"></div>
+                </div>
+            }
 
-                    <div class="absolute inset-0 flex items-end pb-20 sm:items-center sm:pb-0 sm:pt-24">
-                        <div class="w-full max-w-3xl px-6 sm:px-12">
-                            <span class="chip mb-4">@slide.Kind</span>
-                            <h1 class="text-3xl font-extrabold tracking-tight text-content drop-shadow-lg sm:text-5xl lg:text-6xl">
-                                @slide.Title
-                            </h1>
-                            <div class="mt-3 flex flex-wrap items-center gap-3 text-sm text-content/80">
-                                <RatingBadge Score="slide.Score" />
-                                @if (!string.IsNullOrWhiteSpace(slide.Year))
-                                {
-                                    <span>@slide.Year</span>
-                                }
-                            </div>
-                            @if (!string.IsNullOrWhiteSpace(slide.Overview))
+            @* Content layer: only the active slide's text is visible. Hiding inactive
+               slides instantly (no opacity transition) prevents the doubled-title
+               overlap during the backdrop crossfade. *@
+            @for (var i = 0; i < Slides.Count; i++)
+            {
+                var slide = Slides[i];
+                var idx = i;
+                <div class="absolute inset-0 z-10 flex items-end pb-20 sm:items-center sm:pb-0 sm:pt-24"
+                     style="@(idx == 0 ? "" : "visibility:hidden;pointer-events:none")"
+                     x-bind:style="active === @idx ? '' : 'visibility:hidden;pointer-events:none'">
+                    <div class="w-full max-w-3xl px-6 sm:px-12">
+                        <span class="chip mb-4">@slide.Kind</span>
+                        <h1 class="text-3xl font-extrabold tracking-tight text-content drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] sm:text-5xl lg:text-6xl">
+                            @slide.Title
+                        </h1>
+                        <div class="mt-3 flex flex-wrap items-center gap-3 text-sm text-content/80">
+                            <RatingBadge Score="slide.Score" />
+                            @if (!string.IsNullOrWhiteSpace(slide.Year))
                             {
-                                <p class="mt-4 line-clamp-3 max-w-2xl text-sm text-content/85 sm:text-base">@slide.Overview</p>
+                                <span>@slide.Year</span>
                             }
-                            <div class="mt-6 flex flex-wrap gap-3">
-                                <a href="@slide.WatchUrl" class="btn-primary">▶ Watch now</a>
-                                <a href="@slide.TrailerUrl" class="btn-ghost">Watch trailer</a>
-                            </div>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(slide.Overview))
+                        {
+                            <p class="mt-4 line-clamp-3 max-w-2xl text-sm text-content/90 drop-shadow-[0_1px_4px_rgba(0,0,0,0.85)] sm:text-base">@slide.Overview</p>
+                        }
+                        <div class="mt-6 flex flex-wrap gap-3">
+                            <a href="@slide.WatchUrl" class="btn-primary">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                    <path d="M6 4.5v11a.5.5 0 0 0 .77.42l9-5.5a.5.5 0 0 0 0-.84l-9-5.5A.5.5 0 0 0 6 4.5z" />
+                                </svg>
+                                <span>Watch now</span>
+                            </a>
+                            <a href="@slide.TrailerUrl" class="btn-ghost">Watch trailer</a>
                         </div>
                     </div>
                 </div>
@@ -82,15 +99,15 @@
                 </button>
 
                 @* Each button is a ≥40px tall/wide tap target; the visible dot is the inner span. *@
-                <div class="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 sm:bottom-6">
+                <div class="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 gap-1 sm:bottom-6">
                     @for (var i = 0; i < Slides.Count; i++)
                     {
                         var dotIndex = i;
                         <button type="button" x-on:click="go(@dotIndex)"
                                 class="flex h-10 items-center justify-center px-1.5"
                                 aria-label="@($"Go to slide {dotIndex + 1}")">
-                            <span x-bind:class="active === @dotIndex ? 'w-8 bg-brand' : 'w-2 bg-content/40 hover:bg-content/70'"
-                                  class="h-2 rounded-full transition-all duration-300"></span>
+                            <span x-bind:class="active === @dotIndex ? 'w-10 bg-brand scale-110' : 'w-2.5 bg-content/50 hover:bg-content/80'"
+                                  class="h-2.5 rounded-full transition-all duration-300"></span>
                         </button>
                     }
                 </div>

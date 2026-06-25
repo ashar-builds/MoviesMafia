@@ -197,7 +197,17 @@ function whenBlazorReady(callback) {
 
 whenBlazorReady(() => {
     // Drive the bar from Blazor's enhanced-navigation lifecycle.
-    Blazor.addEventListener('enhancednavigationstart', () => navProgress.start());
+    Blazor.addEventListener('enhancednavigationstart', () => {
+        navProgress.start();
+        // The nav header lives in the persistent layout, so its Alpine `open`
+        // state survives navigation. Force the mobile dropdown closed whenever a
+        // navigation begins — otherwise it stays open after tapping a link, and a
+        // morph could even leave it open on the next page.
+        const header = document.querySelector('[data-nav-header]');
+        if (header?._x_dataStack) {
+            Alpine.evaluate(header, 'open = false');
+        }
+    });
     Blazor.addEventListener('enhancednavigationend', () => navProgress.complete());
 
     // Blazor Enhanced Navigation morphs the DOM in place. Alpine only scans for
@@ -217,6 +227,22 @@ whenBlazorReady(() => {
         document.querySelectorAll('[x-data]').forEach((el) => {
             // _x_dataStack is set by Alpine once a node has been initialized.
             if (!el._x_dataStack) Alpine.initTree(el);
+        });
+    });
+
+    // After enhanced navigation, if the URL ends in #<id>, scroll that element
+    // into view. Enhanced nav skips the browser's native fragment handling, so
+    // we re-add it here. Used by the trailer page side-panel: each video link
+    // appends `#player` so picking a clip on mobile pops the player back into
+    // view instead of leaving the user staring at the panel.
+    Blazor.addEventListener('enhancednavigationend', () => {
+        const hash = window.location.hash;
+        if (!hash || hash.length < 2) return;
+        const target = document.getElementById(hash.slice(1));
+        if (!target) return;
+        // requestAnimationFrame so the layout has settled before measuring.
+        requestAnimationFrame(() => {
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
     });
 });

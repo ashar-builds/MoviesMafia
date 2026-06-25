@@ -44,18 +44,18 @@
 
         @* ---- Filters ---- *@
         <div class="mt-4 flex flex-wrap items-end gap-3 sm:gap-4">
-            <div class="min-w-[8rem] flex-1 sm:flex-none">
+            <div class="flex-1 sm:flex-none">
                 <label class="label">Sort by</label>
-                <select class="input w-full sm:w-auto" data-bind="Sort" data-on-change="ApplyFilters">
+                <select class="select w-full sm:w-44" data-bind="Sort" data-on-change="ApplyFilters">
                     <option value="relevance" selected="@(Sort == "relevance")">Relevance</option>
                     <option value="rating" selected="@(Sort == "rating")">Top rated</option>
                     <option value="newest" selected="@(Sort == "newest")">Newest</option>
                     <option value="oldest" selected="@(Sort == "oldest")">Oldest</option>
                 </select>
             </div>
-            <div class="min-w-[8rem] flex-1 sm:flex-none">
+            <div class="flex-1 sm:flex-none">
                 <label class="label">Year</label>
-                <select class="input w-full sm:w-auto" data-bind="Year" data-on-change="ApplyFilters">
+                <select class="select w-full sm:w-32" data-bind="Year" data-on-change="ApplyFilters">
                     <option value="" selected="@(Year is null)">Any</option>
                     @foreach (var y in YearOptions)
                     {
@@ -63,9 +63,9 @@
                     }
                 </select>
             </div>
-            <div class="min-w-[8rem] flex-1 sm:flex-none">
+            <div class="flex-1 sm:flex-none">
                 <label class="label">Min rating</label>
-                <select class="input w-full sm:w-auto" data-bind="MinRating" data-on-change="ApplyFilters">
+                <select class="select w-full sm:w-32" data-bind="MinRating" data-on-change="ApplyFilters">
                     <option value="0" selected="@(MinRating == 0)">Any</option>
                     <option value="5" selected="@(MinRating == 5)">5+</option>
                     <option value="6" selected="@(MinRating == 6)">6+</option>
@@ -314,12 +314,12 @@
     private SearchHit ToHit(MovieResult m) => new(
         m.Id, MediaType.Movie, m.Title ?? "Untitled", Tmdb.ImageUrl(m.PosterPath),
         m.Overview, YearOf(m.ReleaseDate), m.VoteAverage,
-        $"/trailer/movie/{m.Id}", $"/watch/movie/{m.Id}");
+        $"/trailer/movie/{m.Id}", $"/watch/movie/{m.Id}", $"/details/movie/{m.Id}");
 
     private SearchHit ToHit(SeriesResult s) => new(
         s.Id, MediaType.Series, s.Name ?? "Untitled", Tmdb.ImageUrl(s.PosterPath),
         s.Overview, YearOf(s.FirstAirDate), s.VoteAverage,
-        $"/trailer/series/{s.Id}", $"/watch/series/{s.Id}");
+        $"/trailer/series/{s.Id}", $"/watch/series/{s.Id}", $"/details/series/{s.Id}");
 
     private RenderFragment ResultsGrid() => __builder =>
     {
@@ -333,7 +333,8 @@
                            Score="r.Score"
                            Badge="@(Scope == SearchScope.All ? r.TypeLabel : null)"
                            TrailerUrl="@r.TrailerUrl"
-                           WatchUrl="@r.WatchUrl" />
+                           WatchUrl="@r.WatchUrl"
+                           DetailsUrl="@r.DetailsUrl" />
             }
         </div>
     };
@@ -345,7 +346,7 @@
 
     public sealed record SearchHit(
         int Id, MediaType Type, string Title, string? PosterUrl, string? Overview,
-        string? Year, double Score, string TrailerUrl, string WatchUrl)
+        string? Year, double Score, string TrailerUrl, string WatchUrl, string DetailsUrl)
     {
         public string TypeLabel => Type == MediaType.Movie ? "Movie" : "Series";
         public int? NumericYear => int.TryParse(Year, out var y) ? y : null;

@@ -1,0 +1,613 @@
+@page "/details/{Type}/{TmdbId:int}"
+@using MoviesMafia.Services.Tmdb
+@using MoviesMafia.Services.Tmdb.Dtos
+@inject ITmdbClient Tmdb
+@inject NavigationManager Nav
+
+<PageTitle>@(_displayTitle ?? "Details") — MoviesMafia</PageTitle>
+
+@if (_loadError is not null)
+{
+    <div class="w-full px-4 py-8 sm:px-6 lg:px-10">
+        <StatusMessage IsError="true" Message="@_loadError" />
+        <div class="mt-6">
+            <a href="javascript:history.back()" class="btn-ghost">← Go back</a>
+        </div>
+    </div>
+}
+else if (_displayTitle is null)
+{
+    <div class="w-full px-4 py-16 text-center text-muted sm:px-6 lg:px-10">Loading…</div>
+}
+else
+{
+    @* ---------- Cinematic hero with backdrop ---------- *@
+    <section class="relative w-full overflow-hidden bg-ink">
+        @if (!string.IsNullOrWhiteSpace(_backdropUrl))
+        {
+            <img src="@_backdropUrl" alt="@_displayTitle backdrop"
+                 class="absolute inset-0 h-full w-full object-cover opacity-60" loading="eager" />
+        }
+        <div class="absolute inset-0 bg-gradient-to-t from-ink via-ink/85 to-ink/40"></div>
+        <div class="absolute inset-0 bg-gradient-to-r from-ink/90 via-ink/40 to-transparent"></div>
+
+        <div class="relative z-10 w-full px-4 py-10 sm:px-6 sm:py-14 lg:px-10 lg:py-20">
+            <div class="grid gap-8 sm:gap-10 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]">
+
+                @* ---- Poster ---- *@
+                <div class="mx-auto w-44 sm:w-56 lg:mx-0 lg:w-full">
+                    <div class="card overflow-hidden shadow-[var(--shadow-2xl)] ring-1 ring-white/10">
+                        @if (!string.IsNullOrWhiteSpace(_posterUrl))
+                        {
+                            <img src="@_posterUrl" alt="@_displayTitle poster"
+                                 class="aspect-[2/3] h-full w-full object-cover" />
+                        }
+                        else
+                        {
+                            <div class="flex aspect-[2/3] items-center justify-center bg-surface-2 text-muted">No image</div>
+                        }
+                    </div>
+                </div>
+
+                @* ---- Headline + meta + actions ---- *@
+                <div class="min-w-0">
+                    @* Back + kind chip share a baseline so neither floats above/below the other. *@
+                    <div class="mb-4 flex items-center gap-3">
+                        <a href="javascript:history.back()" class="inline-flex items-center gap-1 text-sm text-content/70 transition hover:text-content">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 11-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                            </svg>
+                            <span>Back</span>
+                        </a>
+                        <span class="chip">@KindLabel</span>
+                    </div>
+
+                    <h1 class="text-3xl font-extrabold leading-tight tracking-tight text-content drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] sm:text-4xl lg:text-5xl">
+                        @_displayTitle
+                    </h1>
+
+                    @if (!string.IsNullOrWhiteSpace(_tagline))
+                    {
+                        <p class="mt-2 text-base italic text-content/70 sm:text-lg">“@_tagline”</p>
+                    }
+
+                    @* ---- Inline meta strip ---- *@
+                    <div class="mt-4 flex flex-wrap items-center gap-3 text-sm text-content/85">
+                        <RatingBadge Score="_score" />
+                        @if (!string.IsNullOrWhiteSpace(_year))
+                        {
+                            <span class="inline-flex items-center gap-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-content/60" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                    <path fill-rule="evenodd" d="M6 2a1 1 0 011 1v1h6V3a1 1 0 112 0v1h1a2 2 0 012 2v11a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2h1V3a1 1 0 011-1zm10 6H4v9h12V8z" clip-rule="evenodd" />
+                                </svg>
+                                <span>@_year</span>
+                            </span>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(_runtimeLabel))
+                        {
+                            <span class="inline-flex items-center gap-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-content/60" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-13a.75.75 0 00-1.5 0v5c0 .2.08.39.22.53l3 3a.75.75 0 101.06-1.06L10.75 9.69V5z" clip-rule="evenodd" />
+                                </svg>
+                                <span>@_runtimeLabel</span>
+                            </span>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(_status))
+                        {
+                            <span class="rounded-full border border-line/60 px-2 py-0.5 text-xs uppercase tracking-wide text-content/70">@_status</span>
+                        }
+                    </div>
+
+                    @if (_genres.Count > 0)
+                    {
+                        <div class="mt-4 flex flex-wrap gap-2">
+                            @foreach (var g in _genres)
+                            {
+                                <span class="rounded-full border border-line bg-surface/60 px-3 py-1 text-xs text-content/80 backdrop-blur">@g</span>
+                            }
+                        </div>
+                    }
+
+                    @* ---- Action buttons (mirrors the card overlay) ---- *@
+                    <div class="mt-6 flex flex-wrap gap-3">
+                        <a href="@WatchUrl" class="btn-primary">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <path d="M6 4.5v11a.5.5 0 0 0 .77.42l9-5.5a.5.5 0 0 0 0-.84l-9-5.5A.5.5 0 0 0 6 4.5z" />
+                            </svg>
+                            <span>Watch now</span>
+                        </a>
+                        <a href="@TrailerUrl" class="btn-ghost">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <path fill-rule="evenodd" d="M2 6a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zm14.553.106A1 1 0 0016 7v6a1 1 0 001.447.894l2-1A1 1 0 0020 12V8a1 1 0 00-.553-.894l-2-1z" clip-rule="evenodd" />
+                            </svg>
+                            <span>Watch trailer</span>
+                        </a>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(_overview))
+                    {
+                        <div class="mt-8">
+                            <h2 class="text-lg font-semibold text-content sm:text-xl">Overview</h2>
+                            <p class="mt-2 max-w-3xl text-sm leading-relaxed text-content/90 sm:text-base">@_overview</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </section>
+
+    @* ---------- Facts strip ---------- *@
+    @if (_facts.Count > 0)
+    {
+        <div class="w-full px-4 sm:px-6 lg:px-10">
+            <div class="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+                @foreach (var f in _facts)
+                {
+                    <div class="bg-surface p-4">
+                        <p class="text-xs uppercase tracking-wide text-muted">@f.Label</p>
+                        <p class="mt-1 text-sm font-semibold text-content sm:text-base">@f.Value</p>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    @* ---------- Cast (plain horizontal scroller, circular avatars) ---------- *@
+    @if (_cast.Count > 0)
+    {
+        <section class="w-full px-4 pt-12 sm:px-6 lg:px-10">
+            <header class="mb-4">
+                <h2 class="text-2xl font-bold sm:text-3xl">Top cast</h2>
+                <p class="mt-1 text-sm text-on-surface-variant">The faces behind the story</p>
+            </header>
+            <div class="scrollbar-hide -mx-2 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-2 pb-2">
+                @foreach (var c in _cast)
+                {
+                    <div class="w-28 shrink-0 snap-start text-center sm:w-32">
+                        <div class="mx-auto aspect-square w-full overflow-hidden rounded-full bg-surface-2 ring-1 ring-line">
+                            @if (!string.IsNullOrWhiteSpace(c.PhotoUrl))
+                            {
+                                <img src="@c.PhotoUrl" alt="@c.Name" loading="lazy"
+                                     class="h-full w-full object-cover object-top" />
+                            }
+                            else
+                            {
+                                <div class="flex h-full items-center justify-center text-muted">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                        <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
+                                    </svg>
+                                </div>
+                            }
+                        </div>
+                        <p class="mt-2 line-clamp-2 text-sm font-semibold leading-tight" title="@c.Name">@c.Name</p>
+                        @if (!string.IsNullOrWhiteSpace(c.Character))
+                        {
+                            <p class="mt-0.5 line-clamp-2 text-xs text-muted" title="@c.Character">@c.Character</p>
+                        }
+                    </div>
+                }
+            </div>
+        </section>
+    }
+
+    @* ---------- Crew highlights ---------- *@
+    @if (_crewHighlights.Count > 0)
+    {
+        <section class="w-full px-4 pt-12 sm:px-6 lg:px-10">
+            <h2 class="text-2xl font-bold sm:text-3xl">Crew highlights</h2>
+            <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                @foreach (var g in _crewHighlights)
+                {
+                    <div class="rounded-xl border border-line bg-surface p-4">
+                        <p class="text-xs uppercase tracking-wide text-muted">@g.Role</p>
+                        <p class="mt-1 text-sm font-semibold text-content sm:text-base">@g.Names</p>
+                    </div>
+                }
+            </div>
+        </section>
+    }
+
+    @* ---------- Production companies ---------- *@
+    @if (_productionCompanies.Count > 0)
+    {
+        <section class="w-full px-4 pt-12 sm:px-6 lg:px-10">
+            <h2 class="text-2xl font-bold sm:text-3xl">@(IsSeries ? "Networks & studios" : "Production")</h2>
+            <div class="mt-4 flex flex-wrap gap-3">
+                @foreach (var p in _productionCompanies)
+                {
+                    <div class="flex items-center gap-3 rounded-xl border border-line bg-surface px-4 py-3">
+                        @if (!string.IsNullOrWhiteSpace(p.LogoUrl))
+                        {
+                            <div class="flex h-10 w-16 items-center justify-center overflow-hidden rounded bg-white/90 p-1">
+                                <img src="@p.LogoUrl" alt="@p.Name logo" class="max-h-full max-w-full object-contain" loading="lazy" />
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="flex h-10 w-10 items-center justify-center rounded bg-surface-2 text-muted">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                    <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+                                </svg>
+                            </div>
+                        }
+                        <div class="min-w-0">
+                            <p class="text-sm font-semibold text-content">@p.Name</p>
+                            @if (!string.IsNullOrWhiteSpace(p.OriginCountry))
+                            {
+                                <p class="text-xs text-muted">@p.OriginCountry</p>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </section>
+    }
+
+    @* ---------- Seasons (series only) ---------- *@
+    @if (_seasons.Count > 0)
+    {
+        <div class="w-full px-4 pt-12 sm:px-6 lg:px-10">
+            <h2 class="text-2xl font-bold sm:text-3xl">Seasons</h2>
+            <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                @foreach (var s in _seasons)
+                {
+                    <a href="@($"/watch/series/{TmdbId}?season={s.SeasonNumber}&episode=1")"
+                       class="card flex gap-4 overflow-hidden p-3 transition hover:border-brand hover:bg-surface-2/50">
+                        <div class="h-32 w-20 shrink-0 overflow-hidden rounded-lg bg-surface-2">
+                            @if (!string.IsNullOrWhiteSpace(s.PosterUrl))
+                            {
+                                <img src="@s.PosterUrl" alt="@s.Name" loading="lazy"
+                                     class="h-full w-full object-cover" />
+                            }
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="line-clamp-1 text-base font-semibold">@s.Name</p>
+                            <p class="mt-1 text-xs text-muted">
+                                @s.EpisodeCount episode@(s.EpisodeCount == 1 ? "" : "s")
+                                @if (!string.IsNullOrWhiteSpace(s.AirDate))
+                                {
+                                    <span> • @s.AirDate</span>
+                                }
+                            </p>
+                            @if (!string.IsNullOrWhiteSpace(s.Overview))
+                            {
+                                <p class="mt-2 line-clamp-3 text-xs text-content/80">@s.Overview</p>
+                            }
+                        </div>
+                    </a>
+                }
+            </div>
+        </div>
+    }
+
+    @* ---------- Recommendations ---------- *@
+    @if (_recommendations.Count > 0)
+    {
+        <div class="w-full px-4 sm:px-6 lg:px-10">
+            <MediaRow Title="More like this" Subtitle="@($"Other {(IsSeries ? "series" : "movies")} you might enjoy")">
+                @foreach (var r in _recommendations)
+                {
+                    <div class="w-44 shrink-0 snap-start sm:w-52">
+                        <MediaCard Title="@r.Title"
+                                   PosterUrl="@r.PosterUrl"
+                                   Overview="@r.Overview"
+                                   Year="@r.Year"
+                                   Score="r.Score"
+                                   TrailerUrl="@r.TrailerUrl"
+                                   WatchUrl="@r.WatchUrl"
+                                   DetailsUrl="@r.DetailsUrl" />
+                    </div>
+                }
+            </MediaRow>
+        </div>
+    }
+
+    @* ---------- External links ---------- *@
+    @if (!string.IsNullOrWhiteSpace(_homepageUrl) || !string.IsNullOrWhiteSpace(_imdbUrl))
+    {
+        <section class="w-full px-4 pt-12 sm:px-6 lg:px-10">
+            <h2 class="text-2xl font-bold sm:text-3xl">Links</h2>
+            <div class="mt-4 flex flex-wrap gap-3">
+                @if (!string.IsNullOrWhiteSpace(_imdbUrl))
+                {
+                    <a href="@_imdbUrl" target="_blank" rel="noopener noreferrer"
+                       class="inline-flex items-center gap-2 rounded-xl border border-line bg-surface px-4 py-2 text-sm font-semibold text-content transition hover:border-brand hover:bg-surface-2">
+                        <span class="rounded bg-yellow-400 px-1.5 py-0.5 text-xs font-extrabold text-black">IMDb</span>
+                        <span>View on IMDb</span>
+                    </a>
+                }
+                @if (!string.IsNullOrWhiteSpace(_homepageUrl))
+                {
+                    <a href="@_homepageUrl" target="_blank" rel="noopener noreferrer"
+                       class="inline-flex items-center gap-2 rounded-xl border border-line bg-surface px-4 py-2 text-sm font-semibold text-content transition hover:border-brand hover:bg-surface-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7.5 8a.5.5 0 100-1 .5.5 0 000 1zm5 0a.5.5 0 100-1 .5.5 0 000 1zM10 15a5 5 0 01-4.546-2.916.5.5 0 11.908-.417A4 4 0 0010 14a4 4 0 003.638-2.333.5.5 0 11.908.417A5 5 0 0110 15z" clip-rule="evenodd" />
+                        </svg>
+                        <span>Official site</span>
+                    </a>
+                }
+            </div>
+        </section>
+    }
+
+    <div class="h-16"></div>
+}
+
+@code {
+    [Parameter] public string Type { get; set; } = "movie";
+    [Parameter] public int TmdbId { get; set; }
+
+    private string? _displayTitle;
+    private string? _originalTitle;
+    private string? _tagline;
+    private string? _overview;
+    private string? _posterUrl;
+    private string? _backdropUrl;
+    private string? _year;
+    private string? _runtimeLabel;
+    private string? _status;
+    private string? _homepageUrl;
+    private string? _imdbUrl;
+    private double _score;
+    private List<string> _genres = new();
+    private List<CastVm> _cast = new();
+    private List<SeasonVm> _seasons = new();
+    private List<Fact> _facts = new();
+    private List<CrewGroup> _crewHighlights = new();
+    private List<CompanyVm> _productionCompanies = new();
+    private List<CardVm> _recommendations = new();
+    private string? _loadError;
+
+    private bool IsSeries => string.Equals(Type, "series", StringComparison.OrdinalIgnoreCase);
+    private string KindLabel => IsSeries ? "Series" : "Movie";
+    private string WatchUrl => $"/watch/{(IsSeries ? "series" : "movie")}/{TmdbId}";
+    private string TrailerUrl => $"/trailer/{(IsSeries ? "series" : "movie")}/{TmdbId}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            if (IsSeries)
+            {
+                await LoadSeriesAsync();
+            }
+            else
+            {
+                await LoadMovieAsync();
+            }
+        }
+        catch
+        {
+            _loadError = "We couldn't load the details right now. Please try again shortly.";
+        }
+    }
+
+    private async Task LoadMovieAsync()
+    {
+        var detailsTask = Tmdb.GetMovieDetailsAsync(TmdbId);
+        var creditsTask = Tmdb.GetMovieCreditsAsync(TmdbId);
+        var recsTask = Tmdb.GetMovieRecommendationsAsync(TmdbId);
+        await Task.WhenAll(detailsTask, creditsTask, recsTask);
+
+        var d = await detailsTask;
+        if (d is null)
+        {
+            _loadError = "Movie not found.";
+            return;
+        }
+
+        var credits = await creditsTask;
+
+        _displayTitle = d.Title ?? d.OriginalTitle ?? "Untitled";
+        _originalTitle = (!string.IsNullOrWhiteSpace(d.OriginalTitle) &&
+                         !string.Equals(d.OriginalTitle, d.Title, StringComparison.Ordinal))
+            ? d.OriginalTitle : null;
+        _tagline = d.Tagline;
+        _overview = d.Overview;
+        _posterUrl = Tmdb.ImageUrl(d.PosterPath, "w500");
+        _backdropUrl = Tmdb.ImageUrl(d.BackdropPath, "original");
+        _year = YearFrom(d.ReleaseDate);
+        _runtimeLabel = FormatRuntime(d.Runtime);
+        _status = d.Status;
+        _score = d.VoteAverage;
+        _homepageUrl = !string.IsNullOrWhiteSpace(d.Homepage) ? d.Homepage : null;
+        _imdbUrl = !string.IsNullOrWhiteSpace(d.ImdbId) ? $"https://www.imdb.com/title/{d.ImdbId}/" : null;
+        _genres = d.Genres.Where(g => !string.IsNullOrWhiteSpace(g.Name)).Select(g => g.Name!).ToList();
+
+        _facts = new();
+        if (!string.IsNullOrWhiteSpace(d.ReleaseDate)) _facts.Add(new("Release date", d.ReleaseDate!));
+        if (d.Runtime is int r and > 0) _facts.Add(new("Runtime", FormatRuntime(r) ?? $"{r} min"));
+        if (!string.IsNullOrWhiteSpace(d.Status)) _facts.Add(new("Status", d.Status!));
+        if (!string.IsNullOrWhiteSpace(_originalTitle)) _facts.Add(new("Original title", _originalTitle!));
+        if (!string.IsNullOrWhiteSpace(d.OriginalLanguage)) _facts.Add(new("Original language", FriendlyLanguage(d.OriginalLanguage, d.SpokenLanguages)));
+        if (d.Budget > 0) _facts.Add(new("Budget", FormatMoney(d.Budget)));
+        if (d.Revenue > 0) _facts.Add(new("Revenue", FormatMoney(d.Revenue)));
+        if (d.VoteCount > 0) _facts.Add(new("Votes", d.VoteCount.ToString("N0")));
+        if (d.Popularity > 0) _facts.Add(new("Popularity", d.Popularity.ToString("N1")));
+        if (d.ProductionCountries.FirstOrDefault()?.Name is { Length: > 0 } country) _facts.Add(new("Country", country));
+        if (d.Adult) _facts.Add(new("Audience", "18+"));
+
+        _crewHighlights = new();
+        if (credits is not null)
+        {
+            AddCrewGroup(credits.Crew, "Director", new[] { "Director" });
+            AddCrewGroup(credits.Crew, "Writers", new[] { "Screenplay", "Writer", "Story" });
+            AddCrewGroup(credits.Crew, "Producers", new[] { "Producer" });
+            AddCrewGroup(credits.Crew, "Cinematography", new[] { "Director of Photography" });
+            AddCrewGroup(credits.Crew, "Original music", new[] { "Original Music Composer", "Music" });
+        }
+
+        _productionCompanies = d.ProductionCompanies
+            .Where(p => !string.IsNullOrWhiteSpace(p.Name))
+            .Select(p => new CompanyVm(p.Name!, Tmdb.ImageUrl(p.LogoPath, "w185"), p.OriginCountry))
+            .ToList();
+
+        _cast = credits?.Cast
+            .OrderBy(c => c.Order)
+            .Take(20)
+            .Select(c => new CastVm(c.Name ?? "Unknown", c.Character, Tmdb.ImageUrl(c.ProfilePath, "w300")))
+            .ToList() ?? new();
+
+        _recommendations = (await recsTask).Results
+            .Where(m => !string.IsNullOrWhiteSpace(m.PosterPath))
+            .Take(20)
+            .Select(m => new CardVm(
+                m.Title ?? m.OriginalTitle ?? "Untitled",
+                Tmdb.ImageUrl(m.PosterPath),
+                m.Overview,
+                YearFrom(m.ReleaseDate),
+                m.VoteAverage,
+                $"/trailer/movie/{m.Id}",
+                $"/watch/movie/{m.Id}",
+                $"/details/movie/{m.Id}"))
+            .ToList();
+    }
+
+    private async Task LoadSeriesAsync()
+    {
+        var detailsTask = Tmdb.GetSeriesDetailsAsync(TmdbId);
+        var creditsTask = Tmdb.GetSeriesCreditsAsync(TmdbId);
+        var recsTask = Tmdb.GetSeriesRecommendationsAsync(TmdbId);
+        await Task.WhenAll(detailsTask, creditsTask, recsTask);
+
+        var d = await detailsTask;
+        if (d is null)
+        {
+            _loadError = "Series not found.";
+            return;
+        }
+
+        var credits = await creditsTask;
+
+        _displayTitle = d.Name ?? d.OriginalName ?? "Untitled";
+        _originalTitle = (!string.IsNullOrWhiteSpace(d.OriginalName) &&
+                         !string.Equals(d.OriginalName, d.Name, StringComparison.Ordinal))
+            ? d.OriginalName : null;
+        _tagline = d.Tagline;
+        _overview = d.Overview;
+        _posterUrl = Tmdb.ImageUrl(d.PosterPath, "w500");
+        _backdropUrl = Tmdb.ImageUrl(d.BackdropPath, "original");
+        _year = YearFrom(d.FirstAirDate);
+        var avgEp = d.EpisodeRunTime.FirstOrDefault();
+        _runtimeLabel = avgEp > 0 ? $"~{avgEp} min/ep" : null;
+        _status = d.Status;
+        _score = d.VoteAverage;
+        _homepageUrl = !string.IsNullOrWhiteSpace(d.Homepage) ? d.Homepage : null;
+        _imdbUrl = null;
+        _genres = d.Genres.Where(g => !string.IsNullOrWhiteSpace(g.Name)).Select(g => g.Name!).ToList();
+
+        _facts = new();
+        if (d.NumberOfSeasons is int ns and > 0) _facts.Add(new("Seasons", ns.ToString()));
+        if (d.NumberOfEpisodes is int ne and > 0) _facts.Add(new("Episodes", ne.ToString()));
+        if (!string.IsNullOrWhiteSpace(d.FirstAirDate)) _facts.Add(new("First aired", d.FirstAirDate!));
+        if (!string.IsNullOrWhiteSpace(d.LastAirDate)) _facts.Add(new("Last aired", d.LastAirDate!));
+        if (!string.IsNullOrWhiteSpace(d.Status)) _facts.Add(new("Status", d.Status!));
+        if (!string.IsNullOrWhiteSpace(d.Type)) _facts.Add(new("Type", d.Type!));
+        _facts.Add(new("In production", d.InProduction ? "Yes" : "No"));
+        if (!string.IsNullOrWhiteSpace(_originalTitle)) _facts.Add(new("Original title", _originalTitle!));
+        if (!string.IsNullOrWhiteSpace(d.OriginalLanguage)) _facts.Add(new("Original language", FriendlyLanguage(d.OriginalLanguage, null)));
+        if (d.VoteCount > 0) _facts.Add(new("Votes", d.VoteCount.ToString("N0")));
+        if (d.Popularity > 0) _facts.Add(new("Popularity", d.Popularity.ToString("N1")));
+        if (d.OriginCountry.FirstOrDefault() is { Length: > 0 } oc) _facts.Add(new("Country", oc));
+        if (d.CreatedBy.Count > 0) _facts.Add(new("Created by", string.Join(", ", d.CreatedBy.Where(c => !string.IsNullOrWhiteSpace(c.Name)).Select(c => c.Name))));
+
+        _crewHighlights = new();
+        if (credits is not null)
+        {
+            AddCrewGroup(credits.Crew, "Executive producers", new[] { "Executive Producer" });
+            AddCrewGroup(credits.Crew, "Writers", new[] { "Writer", "Screenplay", "Story" });
+            AddCrewGroup(credits.Crew, "Directors", new[] { "Director" });
+            AddCrewGroup(credits.Crew, "Original music", new[] { "Original Music Composer", "Music" });
+        }
+
+        _productionCompanies = d.Networks
+            .Where(n => !string.IsNullOrWhiteSpace(n.Name))
+            .Select(n => new CompanyVm(n.Name!, Tmdb.ImageUrl(n.LogoPath, "w185"), n.OriginCountry))
+            .ToList();
+
+        _seasons = d.Seasons
+            .Where(s => s.SeasonNumber >= 1)
+            .OrderBy(s => s.SeasonNumber)
+            .Select(s => new SeasonVm(
+                s.SeasonNumber,
+                s.Name ?? $"Season {s.SeasonNumber}",
+                s.Overview,
+                Tmdb.ImageUrl(s.PosterPath, "w185"),
+                s.AirDate,
+                s.EpisodeCount))
+            .ToList();
+
+        _cast = credits?.Cast
+            .OrderBy(c => c.Order)
+            .Take(20)
+            .Select(c => new CastVm(c.Name ?? "Unknown", c.Character, Tmdb.ImageUrl(c.ProfilePath, "w300")))
+            .ToList() ?? new();
+
+        _recommendations = (await recsTask).Results
+            .Where(s => !string.IsNullOrWhiteSpace(s.PosterPath))
+            .Take(20)
+            .Select(s => new CardVm(
+                s.Name ?? s.OriginalName ?? "Untitled",
+                Tmdb.ImageUrl(s.PosterPath),
+                s.Overview,
+                YearFrom(s.FirstAirDate),
+                s.VoteAverage,
+                $"/trailer/series/{s.Id}",
+                $"/watch/series/{s.Id}",
+                $"/details/series/{s.Id}"))
+            .ToList();
+    }
+
+    private void AddCrewGroup(IEnumerable<CrewMember> crew, string label, string[] jobs)
+    {
+        var names = crew
+            .Where(c => c.Job is not null && jobs.Any(j => string.Equals(c.Job, j, StringComparison.OrdinalIgnoreCase)))
+            .Select(c => c.Name)
+            .Where(n => !string.IsNullOrWhiteSpace(n))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(4)
+            .ToList();
+
+        if (names.Count > 0)
+        {
+            _crewHighlights.Add(new CrewGroup(label, string.Join(", ", names)));
+        }
+    }
+
+    private static string FormatMoney(long amount) =>
+        amount >= 1_000_000_000
+            ? $"${amount / 1_000_000_000.0:0.##}B"
+            : amount >= 1_000_000
+                ? $"${amount / 1_000_000.0:0.##}M"
+                : $"${amount:N0}";
+
+    private static string FriendlyLanguage(string? code, List<SpokenLanguage>? spoken)
+    {
+        if (string.IsNullOrWhiteSpace(code)) return "—";
+        // TMDB language codes are 2-letter ISO codes (e.g. "en"). If spoken_languages
+        // includes a matching entry, prefer its english_name; otherwise fall back to
+        // the uppercased code, which still beats a raw "en" in the UI.
+        var spokenMatch = spoken?
+            .Select(s => s.EnglishName)
+            .FirstOrDefault(n => !string.IsNullOrWhiteSpace(n));
+        return spokenMatch ?? code.ToUpperInvariant();
+    }
+
+    private static string? YearFrom(string? date) =>
+        !string.IsNullOrEmpty(date) && date.Length >= 4 ? date[..4] : null;
+
+    private static string? FormatRuntime(int? minutes)
+    {
+        if (minutes is not int m || m <= 0) return null;
+        var h = m / 60;
+        var rem = m % 60;
+        return h > 0 ? (rem > 0 ? $"{h}h {rem}m" : $"{h}h") : $"{m}m";
+    }
+
+    private sealed record CastVm(string Name, string? Character, string? PhotoUrl);
+    private sealed record SeasonVm(int SeasonNumber, string Name, string? Overview, string? PosterUrl, string? AirDate, int EpisodeCount);
+    private sealed record Fact(string Label, string Value);
+    private sealed record CrewGroup(string Role, string Names);
+    private sealed record CompanyVm(string Name, string? LogoUrl, string? OriginCountry);
+    private sealed record CardVm(string Title, string? PosterUrl, string? Overview, string? Year, double Score, string TrailerUrl, string WatchUrl, string DetailsUrl);
+}

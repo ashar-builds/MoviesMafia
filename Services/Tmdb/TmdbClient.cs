@@ -66,6 +66,51 @@ public sealed class TmdbClient : ITmdbClient
         }
     }
 
+    public async Task<MovieDetails?> GetMovieDetailsAsync(int movieId, CancellationToken ct = default)
+    {
+        try
+        {
+            return await GetAsync<MovieDetails>($"movie/{movieId}", new(), ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Failed to fetch TMDB movie details for {MovieId}", movieId);
+            return null;
+        }
+    }
+
+    public async Task<CreditsResponse?> GetMovieCreditsAsync(int movieId, CancellationToken ct = default)
+    {
+        try
+        {
+            return await GetAsync<CreditsResponse>($"movie/{movieId}/credits", new(), ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Failed to fetch TMDB movie credits for {MovieId}", movieId);
+            return null;
+        }
+    }
+
+    public async Task<CreditsResponse?> GetSeriesCreditsAsync(int seriesId, CancellationToken ct = default)
+    {
+        try
+        {
+            return await GetAsync<CreditsResponse>($"tv/{seriesId}/credits", new(), ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Failed to fetch TMDB series credits for {SeriesId}", seriesId);
+            return null;
+        }
+    }
+
+    public Task<MoviePage> GetMovieRecommendationsAsync(int movieId, int page = 1, CancellationToken ct = default) =>
+        GetAsync<MoviePage>($"movie/{movieId}/recommendations", new() { ["page"] = page.ToString() }, ct);
+
+    public Task<SeriesPage> GetSeriesRecommendationsAsync(int seriesId, int page = 1, CancellationToken ct = default) =>
+        GetAsync<SeriesPage>($"tv/{seriesId}/recommendations", new() { ["page"] = page.ToString() }, ct);
+
     public Task<MoviePage> GetTrendingMoviesAsync(string window = "day", int page = 1, CancellationToken ct = default)
     {
         var w = string.Equals(window, "week", StringComparison.OrdinalIgnoreCase) ? "week" : "day";

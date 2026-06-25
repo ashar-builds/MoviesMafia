@@ -105,6 +105,16 @@
                transition;
     }
 
+    /* Select that draws its own chevron right next to the text instead of at the far right edge. */
+    .select {
+        @apply w-full rounded-lg bg-surface-2 border border-line pl-3.5 pr-9 py-2.5 text-sm text-content
+               focus:outline-none focus:border-brand/70 focus:ring-2 focus:ring-brand/30
+               transition appearance-none bg-no-repeat;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%239ca3af'><path fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.06l3.71-3.83a.75.75 0 111.08 1.04l-4.25 4.39a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z' clip-rule='evenodd'/></svg>");
+        background-position: right 0.625rem center;
+        background-size: 1rem 1rem;
+    }
+
     .label {
         @apply block text-sm font-medium text-muted mb-1.5;
     }

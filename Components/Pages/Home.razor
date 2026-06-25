@@ -97,24 +97,26 @@
     private static string? Year(string? date) => HomeMappers.Year(date);
 
     private RenderFragment MovieCard(MovieResult m) =>
-        @<div class="w-40 shrink-0 snap-start sm:w-48">
+        @<div class="w-44 shrink-0 snap-start sm:w-52">
             <MediaCard Title="@(m.Title ?? "Untitled")"
                        PosterUrl="@Tmdb.ImageUrl(m.PosterPath)"
                        Overview="@m.Overview"
                        Year="@Year(m.ReleaseDate)"
                        Score="m.VoteAverage"
                        TrailerUrl="@($"/trailer/movie/{m.Id}")"
-                       WatchUrl="@($"/watch/movie/{m.Id}")" />
+                       WatchUrl="@($"/watch/movie/{m.Id}")"
+                       DetailsUrl="@($"/details/movie/{m.Id}")" />
         </div>;
 
     private RenderFragment SeriesCard(SeriesResult s) =>
-        @<div class="w-40 shrink-0 snap-start sm:w-48">
+        @<div class="w-44 shrink-0 snap-start sm:w-52">
             <MediaCard Title="@(s.Name ?? "Untitled")"
                        PosterUrl="@Tmdb.ImageUrl(s.PosterPath)"
                        Overview="@s.Overview"
                        Year="@Year(s.FirstAirDate)"
                        Score="s.VoteAverage"
                        TrailerUrl="@($"/trailer/series/{s.Id}")"
-                       WatchUrl="@($"/watch/series/{s.Id}")" />
+                       WatchUrl="@($"/watch/series/{s.Id}")"
+                       DetailsUrl="@($"/details/series/{s.Id}")" />
         </div>;
 }

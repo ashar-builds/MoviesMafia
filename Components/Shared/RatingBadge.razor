@@ -11,11 +11,12 @@
         {
             var tone = Score switch
             {
-                >= 8 => "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
-                >= 5 => "bg-amber-500/15 text-amber-300 border-amber-500/30",
-                _ => "bg-primary-container/15 text-primary border-primary/30",
+                >= 8 => "text-emerald-300 ring-emerald-400/40",
+                >= 5 => "text-amber-300 ring-amber-400/40",
+                _ => "text-rose-300 ring-rose-400/40",
             };
-            return $"inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold tabular-nums {tone}";
+            // Always sit on a dark blurred chip so the score stays readable on bright posters.
+            return $"inline-flex items-center gap-1 rounded-md bg-black/55 px-2 py-0.5 text-xs font-semibold tabular-nums ring-1 backdrop-blur {tone}";
         }
     }
 }

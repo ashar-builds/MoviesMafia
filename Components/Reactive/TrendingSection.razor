@@ -6,7 +6,7 @@
 @* Trending row with Today / This Week filter. Server-driven via ReactiveBlazor.
    Kind = "movies" (default) or "series". *@
 <ReactiveRoot Owner="this">
-    <section class="mt-12">
+    <section class="mt-14 sm:mt-16">
         <header class="mb-4 flex flex-wrap items-end justify-between gap-4">
             <div>
                 <h2 class="text-2xl font-bold sm:text-3xl">Trending @KindLabel</h2>
@@ -36,14 +36,15 @@
                 {
                     @foreach (var c in Items)
                     {
-                        <div class="w-40 shrink-0 snap-start sm:w-48">
+                        <div class="w-44 shrink-0 snap-start sm:w-52">
                             <MediaCard Title="@c.Title"
                                        PosterUrl="@c.PosterUrl"
                                        Overview="@c.Overview"
                                        Year="@c.Year"
                                        Score="c.Score"
                                        TrailerUrl="@c.TrailerUrl"
-                                       WatchUrl="@c.WatchUrl" />
+                                       WatchUrl="@c.WatchUrl"
+                                       DetailsUrl="@c.DetailsUrl" />
                         </div>
                     }
                 }
@@ -93,7 +94,8 @@
                     Year(s.FirstAirDate),
                     s.VoteAverage,
                     $"/trailer/series/{s.Id}",
-                    $"/watch/series/{s.Id}")).ToList();
+                    $"/watch/series/{s.Id}",
+                    $"/details/series/{s.Id}")).ToList();
             }
             else
             {
@@ -105,7 +107,8 @@
                     Year(m.ReleaseDate),
                     m.VoteAverage,
                     $"/trailer/movie/{m.Id}",
-                    $"/watch/movie/{m.Id}")).ToList();
+                    $"/watch/movie/{m.Id}",
+                    $"/details/movie/{m.Id}")).ToList();
             }
         }
         catch
@@ -117,12 +120,12 @@
     private string TabClass(string value) =>
         Window == value
             ? "rounded-full px-4 py-1.5 font-semibold transition bg-brand text-white"
-            : "rounded-full px-4 py-1.5 font-semibold transition text-muted hover:text-content";
+            : "rounded-full px-4 py-1.5 font-semibold transition text-content/70 hover:text-content hover:bg-surface-2/60";
 
     private static string? Year(string? date) =>
         !string.IsNullOrEmpty(date) && date.Length >= 4 ? date[..4] : null;
 
     public sealed record Card(
         string Title, string? PosterUrl, string? Overview, string? Year,
-        double Score, string TrailerUrl, string WatchUrl);
+        double Score, string TrailerUrl, string WatchUrl, string DetailsUrl);
 }
