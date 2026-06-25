@@ -2,73 +2,252 @@
 @attribute [Authorize]
 @using MoviesMafia.Services.Streaming
 @using MoviesMafia.Services.Tmdb
+@using MoviesMafia.Services.Tmdb.Dtos
 @inject ITmdbClient Tmdb
 @inject IEmbedUrlBuilder Embed
 
 <PageTitle>@(_title ?? "Watch") — MoviesMafia</PageTitle>
 
-<div class="w-full px-4 py-8 sm:px-6 lg:px-10">
-<div class="mb-4 flex items-center justify-between gap-4">
-    <h1 class="min-w-0 truncate text-xl font-bold sm:text-2xl">@(_title ?? "Now playing")</h1>
-
-    @* Ad-blocker advisory: pure client-side modal via Alpine. *@
-    <div x-data="{ open: false }" class="relative shrink-0">
-        <button type="button" class="btn-ghost" x-on:click="open = true">Playback tips</button>
-        <div x-show="open" x-cloak x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-             x-on:click.self="open = false" x-on:keydown.escape.window="open = false">
-            <div class="card max-w-[28rem] p-6">
-                <h2 class="text-lg font-semibold">Heads up</h2>
-                <p class="mt-2 text-sm text-on-surface-variant">
-                    This player streams from a third-party provider that may show pop-up ads.
-                    Using a reputable ad blocker is strongly recommended for the best experience.
-                </p>
-                <div class="mt-5 text-right">
-                    <button type="button" class="btn-primary" x-on:click="open = false">Got it</button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
 @if (_error is not null)
 {
-    <StatusMessage IsError="true" Message="@_error" />
+    <div class="w-full px-4 py-8 sm:px-6 lg:px-10">
+        <StatusMessage IsError="true" Message="@_error" />
+    </div>
 }
 else
 {
-    @if (IsSeries && _details is not null)
+    @* ---------- Header strip ---------- *@
+    <section class="relative w-full overflow-hidden bg-ink">
+        @if (!string.IsNullOrWhiteSpace(_backdropUrl))
+        {
+            <img src="@_backdropUrl" alt="@_title backdrop"
+                 class="absolute inset-0 h-full w-full object-cover opacity-25" loading="eager" />
+        }
+        <div class="absolute inset-0 bg-gradient-to-b from-ink/80 via-ink/95 to-ink"></div>
+
+        <div class="relative z-10 w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-10">
+            <div class="mb-3 flex items-center gap-3">
+                <a href="javascript:history.back()" class="inline-flex items-center gap-1 text-sm text-content/70 transition hover:text-content">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 11-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                    </svg>
+                    <span>Back</span>
+                </a>
+                <span class="chip">@KindLabel · Now playing</span>
+            </div>
+
+            <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+                <div class="min-w-0 sm:flex-1">
+                    <h1 class="line-clamp-2 text-2xl font-extrabold tracking-tight sm:text-3xl">@(_title ?? "Now playing")</h1>
+                    @if (IsSeries && _details is not null)
+                    {
+                        <p class="mt-1 text-sm text-content/70">Season @SeasonNumber · Episode @EpisodeNumber</p>
+                    }
+                    <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-content/85">
+                        @if (_score > 0)
+                        {
+                            <RatingBadge Score="_score" />
+                        }
+                        @if (!string.IsNullOrWhiteSpace(_year))
+                        {
+                            <span>@_year</span>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(_runtimeLabel))
+                        {
+                            <span>· @_runtimeLabel</span>
+                        }
+                        @if (_genres.Count > 0)
+                        {
+                            <span class="hidden text-content/60 sm:inline">·</span>
+                            <span class="hidden text-content/70 sm:inline">@string.Join(", ", _genres)</span>
+                        }
+                    </div>
+                </div>
+
+                @* Buttons drop below the title on mobile so they never compress the headline. *@
+                <div class="flex flex-wrap items-center gap-2">
+                    <a href="@DetailsUrl" class="btn-ghost px-3 py-1.5 text-sm">More info</a>
+                    <a href="@TrailerUrl" class="btn-ghost px-3 py-1.5 text-sm">Watch trailer</a>
+
+                    @* Ad-blocker advisory: a native <dialog> so the closed state is the
+                       browser default. Alpine state is lost when Blazor enhanced-nav
+                       morphs this subtree on episode switch, which previously left the
+                       modal stuck open with a dead "Got it" button. *@
+                    <button type="button" class="btn-ghost px-3 py-1.5 text-sm"
+                            onclick="document.getElementById('playback-tips').showModal()">
+                        Playback tips
+                    </button>
+                    <dialog id="playback-tips"
+                            class="rounded-2xl border border-line bg-surface p-0 text-content backdrop:bg-black/70 open:flex">
+                        <div class="max-w-[28rem] p-6">
+                            <h2 class="text-lg font-semibold">Heads up</h2>
+                            <p class="mt-2 text-sm text-on-surface-variant">
+                                This player streams from a third-party provider that may show pop-up ads.
+                                Using a reputable ad blocker is strongly recommended for the best experience.
+                            </p>
+                            <div class="mt-5 text-right">
+                                <button type="button" class="btn-primary"
+                                        onclick="document.getElementById('playback-tips').close()">
+                                    Got it
+                                </button>
+                            </div>
+                        </div>
+                    </dialog>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    @* ---------- Player + side rail ---------- *@
+    <div class="w-full px-4 pt-6 sm:px-6 lg:px-10">
+        <div class="grid gap-6 @(IsSeries ? "lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]" : "")">
+
+            <div class="min-w-0">
+                <div id="player" class="aspect-video w-full overflow-hidden rounded-xl border border-white/10 bg-black shadow-[var(--shadow-2xl)] scroll-mt-32">
+                    <iframe src="@_embedUrl" class="h-full w-full" allowfullscreen
+                            referrerpolicy="origin" sandbox="allow-scripts allow-same-origin allow-presentation"></iframe>
+                </div>
+
+                @if (IsSeries)
+                {
+                    <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
+                        @if (PreviousEpisodeUrl is not null)
+                        {
+                            <a href="@PreviousEpisodeUrl" class="btn-ghost px-3 py-1.5 text-sm">← Previous episode</a>
+                        }
+                        else
+                        {
+                            <span></span>
+                        }
+                        @if (NextEpisodeUrl is not null)
+                        {
+                            <a href="@NextEpisodeUrl" class="btn-primary px-3 py-1.5 text-sm">Next episode →</a>
+                        }
+                    </div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(_overview))
+                {
+                    <div class="mt-6">
+                        <h2 class="text-lg font-semibold sm:text-xl">About this @(IsSeries ? "series" : "movie")</h2>
+                        <p class="mt-2 text-sm leading-relaxed text-content/90 sm:text-base">@_overview</p>
+                    </div>
+                }
+
+                @if (_genres.Count > 0)
+                {
+                    <div class="mt-4 flex flex-wrap gap-2">
+                        @foreach (var g in _genres)
+                        {
+                            <span class="rounded-full border border-line bg-surface/60 px-3 py-1 text-xs text-content/80">@g</span>
+                        }
+                    </div>
+                }
+            </div>
+
+            @* ---------- Side rail: season switcher + full episode list (series only) ---------- *@
+            @if (IsSeries && _details is not null)
+            {
+                <aside class="card overflow-hidden">
+                    <div class="border-b border-line bg-surface-2/60 p-4">
+                        <label class="label" for="season">Season</label>
+                        <select id="season" class="input"
+                                onchange="window.location.href='/watch/series/@TmdbId?season='+this.value+'&episode=1#player'">
+                            @foreach (var s in _details.Seasons.Where(s => s.SeasonNumber >= 1))
+                            {
+                                <option value="@s.SeasonNumber" selected="@(s.SeasonNumber == SeasonNumber)">
+                                    @(s.Name ?? $"Season {s.SeasonNumber}") (@s.EpisodeCount eps)
+                                </option>
+                            }
+                        </select>
+                        <p class="mt-2 text-xs text-muted">@EpisodeCountForSeason episode@(EpisodeCountForSeason == 1 ? "" : "s") · currently on episode @EpisodeNumber</p>
+                    </div>
+                    <div class="max-h-[640px] overflow-y-auto">
+                        @for (var e = 1; e <= EpisodeCountForSeason; e++)
+                        {
+                            var ep = e;
+                            var isCurrent = ep == EpisodeNumber;
+                            <a href="@($"/watch/series/{TmdbId}?season={SeasonNumber}&episode={ep}#player")"
+                               class="@($"flex items-center gap-3 border-b border-line/60 px-4 py-3 text-sm transition last:border-b-0 {(isCurrent ? "bg-brand/15 text-content" : "text-content/80 hover:bg-surface-2/60")}")">
+                                <span class="@($"flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold {(isCurrent ? "bg-brand text-white" : "bg-surface-2 text-content/70")}")">
+                                    @ep
+                                </span>
+                                <span class="flex-1 truncate">Episode @ep</span>
+                                @if (isCurrent)
+                                {
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-brand" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                        <path d="M6 4.5v11a.5.5 0 0 0 .77.42l9-5.5a.5.5 0 0 0 0-.84l-9-5.5A.5.5 0 0 0 6 4.5z" />
+                                    </svg>
+                                }
+                            </a>
+                        }
+                    </div>
+                </aside>
+            }
+        </div>
+    </div>
+
+    @* ---------- Top cast ---------- *@
+    @if (_cast.Count > 0)
     {
-        <div class="mb-4 grid gap-3 sm:grid-cols-2">
-            <div>
-                <label class="label" for="season">Season</label>
-                <select id="season" class="input" onchange="window.location.href='/watch/series/@TmdbId?season='+this.value+'&episode=1'">
-                    @foreach (var s in _details.Seasons.Where(s => s.SeasonNumber >= 1))
-                    {
-                        <option value="@s.SeasonNumber" selected="@(s.SeasonNumber == SeasonNumber)">
-                            @(s.Name ?? $"Season {s.SeasonNumber}") (@s.EpisodeCount eps)
-                        </option>
-                    }
-                </select>
+        <section class="w-full px-4 pt-12 sm:px-6 lg:px-10">
+            <header class="mb-4">
+                <h2 class="text-2xl font-bold sm:text-3xl">Top cast</h2>
+            </header>
+            <div class="scrollbar-hide -mx-2 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-2 pb-2">
+                @foreach (var c in _cast)
+                {
+                    <div class="w-28 shrink-0 snap-start text-center sm:w-32">
+                        <div class="mx-auto aspect-square w-full overflow-hidden rounded-full bg-surface-2 ring-1 ring-line">
+                            @if (!string.IsNullOrWhiteSpace(c.PhotoUrl))
+                            {
+                                <img src="@c.PhotoUrl" alt="@c.Name" loading="lazy"
+                                     class="h-full w-full object-cover object-top" />
+                            }
+                            else
+                            {
+                                <div class="flex h-full items-center justify-center text-muted">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                        <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
+                                    </svg>
+                                </div>
+                            }
+                        </div>
+                        <p class="mt-2 line-clamp-2 text-sm font-semibold leading-tight" title="@c.Name">@c.Name</p>
+                        @if (!string.IsNullOrWhiteSpace(c.Character))
+                        {
+                            <p class="mt-0.5 line-clamp-2 text-xs text-muted" title="@c.Character">@c.Character</p>
+                        }
+                    </div>
+                }
             </div>
-            <div>
-                <label class="label" for="episode">Episode</label>
-                <select id="episode" class="input" onchange="window.location.href='/watch/series/@TmdbId?season=@SeasonNumber&episode='+this.value">
-                    @for (var e = 1; e <= EpisodeCountForSeason; e++)
-                    {
-                        var ep = e;
-                        <option value="@ep" selected="@(ep == EpisodeNumber)">Episode @ep</option>
-                    }
-                </select>
-            </div>
+        </section>
+    }
+
+    @* ---------- Recommendations ---------- *@
+    @if (_recommendations.Count > 0)
+    {
+        <div class="w-full px-4 sm:px-6 lg:px-10">
+            <MediaRow Title="More like this" Subtitle="@($"Other {(IsSeries ? "series" : "movies")} you might enjoy")">
+                @foreach (var r in _recommendations)
+                {
+                    <div class="w-44 shrink-0 snap-start sm:w-52">
+                        <MediaCard Title="@r.Title"
+                                   PosterUrl="@r.PosterUrl"
+                                   Overview="@r.Overview"
+                                   Year="@r.Year"
+                                   Score="r.Score"
+                                   TrailerUrl="@r.TrailerUrl"
+                                   WatchUrl="@r.WatchUrl"
+                                   DetailsUrl="@r.DetailsUrl" />
+                    </div>
+                }
+            </MediaRow>
         </div>
     }
 
-    <div class="aspect-video w-full overflow-hidden rounded-xl border border-white/10 bg-black shadow-[var(--shadow-2xl)]">
-        <iframe src="@_embedUrl" class="h-full w-full" allowfullscreen
-                referrerpolicy="origin" sandbox="allow-scripts allow-same-origin allow-presentation"></iframe>
-    </div>
+    <div class="h-16"></div>
 }
-</div>
 
 @code {
     [Parameter] public string Type { get; set; } = "movie";
@@ -78,34 +257,127 @@ else
 
     private string? _embedUrl;
     private string? _title;
+    private string? _overview;
+    private string? _posterUrl;
+    private string? _backdropUrl;
+    private string? _year;
+    private string? _runtimeLabel;
+    private double _score;
+    private List<string> _genres = new();
+    private List<CastVm> _cast = new();
+    private List<CardVm> _recommendations = new();
     private string? _error;
-    private Services.Tmdb.Dtos.SeriesDetails? _details;
+    private SeriesDetails? _details;
 
     private bool IsSeries => string.Equals(Type, "series", StringComparison.OrdinalIgnoreCase);
+    private string KindLabel => IsSeries ? "Series" : "Movie";
     private int SeasonNumber => Season < 1 ? 1 : Season;
     private int EpisodeNumber => Episode < 1 ? 1 : Episode;
+    private string DetailsUrl => $"/details/{(IsSeries ? "series" : "movie")}/{TmdbId}";
+    private string TrailerUrl => $"/trailer/{(IsSeries ? "series" : "movie")}/{TmdbId}";
 
     private int EpisodeCountForSeason =>
         _details?.Seasons.FirstOrDefault(s => s.SeasonNumber == SeasonNumber)?.EpisodeCount ?? 1;
+
+    private string? PreviousEpisodeUrl =>
+        EpisodeNumber > 1 ? $"/watch/series/{TmdbId}?season={SeasonNumber}&episode={EpisodeNumber - 1}#player" : null;
+
+    private string? NextEpisodeUrl =>
+        EpisodeNumber < EpisodeCountForSeason ? $"/watch/series/{TmdbId}?season={SeasonNumber}&episode={EpisodeNumber + 1}#player" : null;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            if (IsSeries)
-            {
-                _details = await Tmdb.GetSeriesDetailsAsync(TmdbId);
-                _title = _details?.Name;
-                _embedUrl = Embed.Episode(TmdbId, SeasonNumber, EpisodeNumber);
-            }
-            else
-            {
-                _embedUrl = Embed.Movie(TmdbId);
-            }
+            if (IsSeries) await LoadSeriesAsync();
+            else await LoadMovieAsync();
         }
         catch
         {
             _error = "We couldn't start playback right now. Please try again shortly.";
         }
     }
+
+    private async Task LoadMovieAsync()
+    {
+        _embedUrl = Embed.Movie(TmdbId);
+
+        var detailsTask = Tmdb.GetMovieDetailsAsync(TmdbId);
+        var creditsTask = Tmdb.GetMovieCreditsAsync(TmdbId);
+        var recsTask = Tmdb.GetMovieRecommendationsAsync(TmdbId);
+        await Task.WhenAll(detailsTask, creditsTask, recsTask);
+
+        var d = await detailsTask;
+        if (d is null) return;
+
+        _title = d.Title ?? d.OriginalTitle;
+        _overview = d.Overview;
+        _posterUrl = Tmdb.ImageUrl(d.PosterPath, "w342");
+        _backdropUrl = Tmdb.ImageUrl(d.BackdropPath, "original");
+        _year = YearFrom(d.ReleaseDate);
+        _runtimeLabel = FormatRuntime(d.Runtime);
+        _score = d.VoteAverage;
+        _genres = d.Genres.Where(g => !string.IsNullOrWhiteSpace(g.Name)).Select(g => g.Name!).ToList();
+
+        _cast = (await creditsTask)?.Cast.OrderBy(c => c.Order).Take(15)
+            .Select(c => new CastVm(c.Name ?? "Unknown", c.Character, Tmdb.ImageUrl(c.ProfilePath, "w300")))
+            .ToList() ?? new();
+
+        _recommendations = (await recsTask).Results
+            .Where(m => !string.IsNullOrWhiteSpace(m.PosterPath)).Take(20)
+            .Select(m => new CardVm(
+                m.Title ?? m.OriginalTitle ?? "Untitled",
+                Tmdb.ImageUrl(m.PosterPath), m.Overview, YearFrom(m.ReleaseDate), m.VoteAverage,
+                $"/trailer/movie/{m.Id}", $"/watch/movie/{m.Id}", $"/details/movie/{m.Id}"))
+            .ToList();
+    }
+
+    private async Task LoadSeriesAsync()
+    {
+        var detailsTask = Tmdb.GetSeriesDetailsAsync(TmdbId);
+        var creditsTask = Tmdb.GetSeriesCreditsAsync(TmdbId);
+        var recsTask = Tmdb.GetSeriesRecommendationsAsync(TmdbId);
+        await Task.WhenAll(detailsTask, creditsTask, recsTask);
+
+        _details = await detailsTask;
+        _embedUrl = Embed.Episode(TmdbId, SeasonNumber, EpisodeNumber);
+
+        if (_details is null) return;
+
+        _title = _details.Name ?? _details.OriginalName;
+        _overview = _details.Overview;
+        _posterUrl = Tmdb.ImageUrl(_details.PosterPath, "w342");
+        _backdropUrl = Tmdb.ImageUrl(_details.BackdropPath, "original");
+        _year = YearFrom(_details.FirstAirDate);
+        var avgEp = _details.EpisodeRunTime.FirstOrDefault();
+        _runtimeLabel = avgEp > 0 ? $"~{avgEp} min/ep" : null;
+        _score = _details.VoteAverage;
+        _genres = _details.Genres.Where(g => !string.IsNullOrWhiteSpace(g.Name)).Select(g => g.Name!).ToList();
+
+        _cast = (await creditsTask)?.Cast.OrderBy(c => c.Order).Take(15)
+            .Select(c => new CastVm(c.Name ?? "Unknown", c.Character, Tmdb.ImageUrl(c.ProfilePath, "w300")))
+            .ToList() ?? new();
+
+        _recommendations = (await recsTask).Results
+            .Where(s => !string.IsNullOrWhiteSpace(s.PosterPath)).Take(20)
+            .Select(s => new CardVm(
+                s.Name ?? s.OriginalName ?? "Untitled",
+                Tmdb.ImageUrl(s.PosterPath), s.Overview, YearFrom(s.FirstAirDate), s.VoteAverage,
+                $"/trailer/series/{s.Id}", $"/watch/series/{s.Id}", $"/details/series/{s.Id}"))
+            .ToList();
+    }
+
+    private static string? YearFrom(string? date) =>
+        !string.IsNullOrEmpty(date) && date.Length >= 4 ? date[..4] : null;
+
+    private static string? FormatRuntime(int? minutes)
+    {
+        if (minutes is not int m || m <= 0) return null;
+        var h = m / 60;
+        var rem = m % 60;
+        return h > 0 ? (rem > 0 ? $"{h}h {rem}m" : $"{h}h") : $"{m}m";
+    }
+
+    private sealed record CastVm(string Name, string? Character, string? PhotoUrl);
+    private sealed record CardVm(string Title, string? PosterUrl, string? Overview, string? Year, double Score, string TrailerUrl, string WatchUrl, string DetailsUrl);
 }

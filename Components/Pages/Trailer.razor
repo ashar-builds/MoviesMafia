@@ -1,21 +1,543 @@
 @page "/trailer/{Type}/{TmdbId:int}"
+@using MoviesMafia.Services.Tmdb
+@using MoviesMafia.Services.Tmdb.Dtos
+@inject ITmdbClient Tmdb
 
-<PageTitle>Trailer — MoviesMafia</PageTitle>
+<PageTitle>@(_title ?? "Trailer") — MoviesMafia</PageTitle>
 
-<div class="w-full px-4 py-8 sm:px-6 lg:px-10">
-<div class="mx-auto max-w-4xl">
-    <div class="mb-4 flex items-center justify-between">
-        <h1 class="text-2xl font-bold">Trailers</h1>
-        <a href="@WatchUrl" class="btn-primary">Watch now</a>
+@if (_loadError is not null)
+{
+    <div class="w-full px-4 py-8 sm:px-6 lg:px-10">
+        <StatusMessage IsError="true" Message="@_loadError" />
+    </div>
+}
+else
+{
+    @* ---------- Hero band ---------- *@
+    <section class="relative w-full overflow-hidden bg-ink">
+        @if (!string.IsNullOrWhiteSpace(_backdropUrl))
+        {
+            <img src="@_backdropUrl" alt="@_title backdrop"
+                 class="absolute inset-0 h-full w-full object-cover opacity-40" loading="eager" />
+        }
+        <div class="absolute inset-0 bg-gradient-to-t from-ink via-ink/90 to-ink/50"></div>
+
+        <div class="relative z-10 w-full px-4 py-8 sm:px-6 sm:py-10 lg:px-10">
+            <div class="mb-4 flex items-center gap-3">
+                <a href="javascript:history.back()" class="inline-flex items-center gap-1 text-sm text-content/70 transition hover:text-content">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 11-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                    </svg>
+                    <span>Back</span>
+                </a>
+                <span class="chip">@KindLabel · Trailer</span>
+            </div>
+
+            <div class="flex flex-col gap-6 lg:flex-row lg:items-start">
+                @if (!string.IsNullOrWhiteSpace(_posterUrl))
+                {
+                    <div class="hidden w-32 shrink-0 overflow-hidden rounded-xl shadow-[var(--shadow-2xl)] ring-1 ring-white/10 sm:block sm:w-40 lg:w-48">
+                        <img src="@_posterUrl" alt="@_title poster" class="h-full w-full object-cover" />
+                    </div>
+                }
+
+                <div class="min-w-0 flex-1">
+                    <h1 class="text-2xl font-extrabold tracking-tight text-content drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] sm:text-3xl lg:text-4xl">
+                        @(_title ?? "Trailers")
+                    </h1>
+
+                    @if (!string.IsNullOrWhiteSpace(_tagline))
+                    {
+                        <p class="mt-1 italic text-content/70">“@_tagline”</p>
+                    }
+
+                    <div class="mt-3 flex flex-wrap items-center gap-3 text-sm text-content/85">
+                        @if (_score > 0)
+                        {
+                            <RatingBadge Score="_score" />
+                        }
+                        @if (!string.IsNullOrWhiteSpace(_year))
+                        {
+                            <span>@_year</span>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(_runtimeLabel))
+                        {
+                            <span>· @_runtimeLabel</span>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(_status))
+                        {
+                            <span class="rounded-full border border-line/60 px-2 py-0.5 text-xs uppercase tracking-wide text-content/70">@_status</span>
+                        }
+                    </div>
+
+                    @if (_genres.Count > 0)
+                    {
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            @foreach (var g in _genres)
+                            {
+                                <span class="rounded-full border border-line bg-surface/60 px-3 py-1 text-xs text-content/80 backdrop-blur">@g</span>
+                            }
+                        </div>
+                    }
+
+                    <div class="mt-5 flex flex-wrap gap-3">
+                        <a href="@WatchUrl" class="btn-primary">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <path d="M6 4.5v11a.5.5 0 0 0 .77.42l9-5.5a.5.5 0 0 0 0-.84l-9-5.5A.5.5 0 0 0 6 4.5z" />
+                            </svg>
+                            <span>Watch now</span>
+                        </a>
+                        <a href="@DetailsUrl" class="btn-ghost">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <path fill-rule="evenodd" d="M18 10A8 8 0 11 2 10a8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                            </svg>
+                            <span>More info</span>
+                        </a>
+                    </div>
+
+                    @* ---- Horizontal stats strip — fills the empty space without growing the hero. ---- *@
+                    @if (_stats.Count > 0 || _directorOrCreator is not null)
+                    {
+                        <div class="mt-5 flex flex-wrap items-stretch gap-3 sm:gap-4">
+                            @if (_score > 0)
+                            {
+                                <div class="@($"flex items-center gap-3 rounded-xl border bg-surface/60 px-4 py-2 backdrop-blur {ScoreRingClass(_score)}")">
+                                    <span class="text-2xl font-extrabold leading-none">@_score.ToString("0.0")</span>
+                                    <div class="text-left text-xs leading-tight">
+                                        <p class="font-semibold uppercase tracking-wide opacity-90">@ScoreLabel(_score)</p>
+                                        @if (_voteCount > 0)
+                                        {
+                                            <p class="opacity-70">@_voteCount.ToString("N0") votes</p>
+                                        }
+                                    </div>
+                                </div>
+                            }
+
+                            @foreach (var s in _stats)
+                            {
+                                <div class="rounded-xl border border-line bg-surface/60 px-4 py-2 backdrop-blur">
+                                    <p class="text-[10px] uppercase tracking-wide text-muted">@s.Label</p>
+                                    <p class="text-sm font-semibold text-content">@s.Value</p>
+                                </div>
+                            }
+
+                            @if (_directorOrCreator is not null)
+                            {
+                                <div class="min-w-0 max-w-xs rounded-xl border border-line bg-surface/60 px-4 py-2 backdrop-blur">
+                                    <p class="text-[10px] uppercase tracking-wide text-muted">@_directorOrCreator.Role</p>
+                                    <p class="line-clamp-1 text-sm font-semibold text-content" title="@_directorOrCreator.Names">@_directorOrCreator.Names</p>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </section>
+
+    @* ---------- Trailer player + side panel ---------- *@
+    <div class="w-full px-4 pt-8 sm:px-6 lg:px-10">
+        @if (_videos.Count == 0)
+        {
+            <div class="card mx-auto max-w-5xl p-10 text-center text-on-surface-variant">
+                No trailers available for this title yet.
+            </div>
+        }
+        else
+        {
+            <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]">
+                <div class="min-w-0">
+                    <div id="player" class="aspect-video w-full overflow-hidden rounded-xl border border-white/10 bg-black shadow-[var(--shadow-2xl)] scroll-mt-32">
+                        <iframe src="@CurrentEmbedUrl" class="h-full w-full" allowfullscreen
+                                referrerpolicy="origin" title="@CurrentVideo.Name"></iframe>
+                    </div>
+
+                    <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
+                        <div class="min-w-0">
+                            <p class="truncate text-base font-semibold sm:text-lg">@CurrentVideo.Name</p>
+                            <p class="text-xs text-muted">
+                                @CurrentVideo.Type
+                                @if (CurrentVideo.Official)
+                                {
+                                    <span> · Official</span>
+                                }
+                                <span> · @(VideoIndex + 1) of @_videos.Count</span>
+                            </p>
+                        </div>
+                        <div class="flex gap-2">
+                            @if (PreviousVideoUrl is not null)
+                            {
+                                <a href="@PreviousVideoUrl" class="btn-ghost px-3 py-1.5 text-sm">← Previous</a>
+                            }
+                            @if (NextVideoUrl is not null)
+                            {
+                                <a href="@NextVideoUrl" class="btn-primary px-3 py-1.5 text-sm">Next →</a>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                @* ---------- Side rail: all videos ---------- *@
+                <aside class="card overflow-hidden">
+                    <div class="border-b border-line bg-surface-2/60 p-4">
+                        <p class="text-sm font-semibold">All videos</p>
+                        <p class="text-xs text-muted">@_videos.Count clip@(_videos.Count == 1 ? "" : "s") available</p>
+                    </div>
+                    <div class="max-h-[640px] overflow-y-auto">
+                        @for (var i = 0; i < _videos.Count; i++)
+                        {
+                            var idx = i;
+                            var v = _videos[idx];
+                            var isCurrent = idx == VideoIndex;
+                            <a href="@VideoUrl(idx)"
+                               class="@($"flex gap-3 border-b border-line/60 p-3 text-sm transition last:border-b-0 {(isCurrent ? "bg-brand/15 text-content" : "text-content/80 hover:bg-surface-2/60")}")">
+                                <div class="relative h-16 w-28 shrink-0 overflow-hidden rounded-md bg-black">
+                                    <img src="@YouTubeThumb(v.Key!)" alt=""
+                                         class="h-full w-full object-cover" loading="lazy" />
+                                    <div class="absolute inset-0 flex items-center justify-center bg-black/30">
+                                        <svg xmlns="http://www.w3.org/2000/svg"
+                                             class="@($"h-6 w-6 {(isCurrent ? "text-brand" : "text-white/90")}")"
+                                             viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                            <path d="M6 4.5v11a.5.5 0 0 0 .77.42l9-5.5a.5.5 0 0 0 0-.84l-9-5.5A.5.5 0 0 0 6 4.5z" />
+                                        </svg>
+                                    </div>
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <p class="line-clamp-2 text-sm font-semibold leading-tight" title="@v.Name">@v.Name</p>
+                                    <p class="mt-1 text-xs text-muted">
+                                        @v.Type
+                                        @if (v.Official)
+                                        {
+                                            <span> · Official</span>
+                                        }
+                                    </p>
+                                </div>
+                            </a>
+                        }
+                    </div>
+                </aside>
+            </div>
+        }
     </div>
 
-    <TrailerPlayer TmdbId="TmdbId" MediaKind="@Type" />
-</div>
-</div>
+    @* ---------- Overview ---------- *@
+    @if (!string.IsNullOrWhiteSpace(_overview))
+    {
+        <section class="w-full px-4 pt-10 sm:px-6 lg:px-10">
+            <h2 class="text-xl font-bold sm:text-2xl">Synopsis</h2>
+            <p class="mt-2 max-w-4xl text-sm leading-relaxed text-content/90 sm:text-base">@_overview</p>
+        </section>
+    }
+
+    @* ---------- Top cast ---------- *@
+    @if (_cast.Count > 0)
+    {
+        <section class="w-full px-4 pt-10 sm:px-6 lg:px-10">
+            <header class="mb-4">
+                <h2 class="text-2xl font-bold sm:text-3xl">Top cast</h2>
+                <p class="mt-1 text-sm text-on-surface-variant">The faces behind the story</p>
+            </header>
+            <div class="scrollbar-hide -mx-2 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-2 pb-2">
+                @foreach (var c in _cast)
+                {
+                    <div class="w-28 shrink-0 snap-start text-center sm:w-32">
+                        <div class="mx-auto aspect-square w-full overflow-hidden rounded-full bg-surface-2 ring-1 ring-line">
+                            @if (!string.IsNullOrWhiteSpace(c.PhotoUrl))
+                            {
+                                <img src="@c.PhotoUrl" alt="@c.Name" loading="lazy"
+                                     class="h-full w-full object-cover object-top" />
+                            }
+                            else
+                            {
+                                <div class="flex h-full items-center justify-center text-muted">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                        <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
+                                    </svg>
+                                </div>
+                            }
+                        </div>
+                        <p class="mt-2 line-clamp-2 text-sm font-semibold leading-tight" title="@c.Name">@c.Name</p>
+                        @if (!string.IsNullOrWhiteSpace(c.Character))
+                        {
+                            <p class="mt-0.5 line-clamp-2 text-xs text-muted" title="@c.Character">@c.Character</p>
+                        }
+                    </div>
+                }
+            </div>
+        </section>
+    }
+
+    @* ---------- Recommendations ---------- *@
+    @if (_recommendations.Count > 0)
+    {
+        <div class="w-full px-4 sm:px-6 lg:px-10">
+            <MediaRow Title="More like this" Subtitle="@($"Other {(IsSeries ? "series" : "movies")} you might enjoy")">
+                @foreach (var r in _recommendations)
+                {
+                    <div class="w-44 shrink-0 snap-start sm:w-52">
+                        <MediaCard Title="@r.Title"
+                                   PosterUrl="@r.PosterUrl"
+                                   Overview="@r.Overview"
+                                   Year="@r.Year"
+                                   Score="r.Score"
+                                   TrailerUrl="@r.TrailerUrl"
+                                   WatchUrl="@r.WatchUrl"
+                                   DetailsUrl="@r.DetailsUrl" />
+                    </div>
+                }
+            </MediaRow>
+        </div>
+    }
+
+    <div class="h-16"></div>
+}
 
 @code {
     [Parameter] public string Type { get; set; } = "movie";
     [Parameter] public int TmdbId { get; set; }
+    [SupplyParameterFromQuery(Name = "v")] public int VideoQuery { get; set; }
 
-    private string WatchUrl => $"/watch/{Type}/{TmdbId}";
+    private string? _title;
+    private string? _tagline;
+    private string? _overview;
+    private string? _posterUrl;
+    private string? _backdropUrl;
+    private string? _year;
+    private string? _runtimeLabel;
+    private string? _status;
+    private string? _languageLabel;
+    private string? _releaseLabel;
+    private double _score;
+    private int _voteCount;
+    private int _seasonsCount;
+    private int _episodesCount;
+    private List<string> _genres = new();
+    private List<CastVm> _cast = new();
+    private List<CardVm> _recommendations = new();
+    private List<VideoResult> _videos = new();
+    private List<StatItem> _stats = new();
+    private CreditGroup? _directorOrCreator;
+    private string? _loadError;
+
+    private int _trailerCount => _videos.Count(v => string.Equals(v.Type, "Trailer", StringComparison.OrdinalIgnoreCase));
+    private int _teaserCount => _videos.Count(v => string.Equals(v.Type, "Teaser", StringComparison.OrdinalIgnoreCase));
+    private int _clipCount => _videos.Count - _trailerCount - _teaserCount;
+
+    private bool IsSeries => string.Equals(Type, "series", StringComparison.OrdinalIgnoreCase);
+    private string KindLabel => IsSeries ? "Series" : "Movie";
+    private string WatchUrl => $"/watch/{(IsSeries ? "series" : "movie")}/{TmdbId}";
+    private string DetailsUrl => $"/details/{(IsSeries ? "series" : "movie")}/{TmdbId}";
+
+    private int VideoIndex => _videos.Count == 0
+        ? 0
+        : Math.Clamp(VideoQuery, 0, _videos.Count - 1);
+
+    private VideoResult CurrentVideo => _videos[VideoIndex];
+    private string CurrentEmbedUrl => $"https://www.youtube.com/embed/{CurrentVideo.Key}?rel=0";
+
+    private string? PreviousVideoUrl =>
+        VideoIndex > 0 ? VideoUrl(VideoIndex - 1) : null;
+
+    private string? NextVideoUrl =>
+        VideoIndex < _videos.Count - 1 ? VideoUrl(VideoIndex + 1) : null;
+
+    private string VideoUrl(int index) =>
+        $"/trailer/{(IsSeries ? "series" : "movie")}/{TmdbId}?v={index}#player";
+
+    private static string YouTubeThumb(string key) =>
+        $"https://i.ytimg.com/vi/{key}/mqdefault.jpg";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            if (IsSeries) await LoadSeriesAsync();
+            else await LoadMovieAsync();
+        }
+        catch
+        {
+            _loadError = "We couldn't load this trailer right now. Please try again shortly.";
+        }
+    }
+
+    /// <summary>
+    /// Keep YouTube-hosted clips only and prioritise official trailers/teasers so the
+    /// first item the user lands on is the most representative video for the title.
+    /// </summary>
+    private static List<VideoResult> RankVideos(IEnumerable<VideoResult> all) =>
+        all.Where(v => v.IsYouTubeTrailer)
+           .OrderBy(v => v.Type switch
+           {
+               "Trailer" => 0,
+               "Teaser" => 1,
+               "Clip" => 2,
+               "Featurette" => 3,
+               "Behind the Scenes" => 4,
+               _ => 5,
+           })
+           .ThenByDescending(v => v.Official)
+           .ToList();
+
+    private async Task LoadMovieAsync()
+    {
+        var detailsTask = Tmdb.GetMovieDetailsAsync(TmdbId);
+        var creditsTask = Tmdb.GetMovieCreditsAsync(TmdbId);
+        var recsTask = Tmdb.GetMovieRecommendationsAsync(TmdbId);
+        var videosTask = Tmdb.GetMovieVideosAsync(TmdbId);
+        await Task.WhenAll(detailsTask, creditsTask, recsTask, videosTask);
+
+        var d = await detailsTask;
+        if (d is null) return;
+
+        _title = d.Title ?? d.OriginalTitle;
+        _tagline = d.Tagline;
+        _overview = d.Overview;
+        _posterUrl = Tmdb.ImageUrl(d.PosterPath, "w342");
+        _backdropUrl = Tmdb.ImageUrl(d.BackdropPath, "original");
+        _year = YearFrom(d.ReleaseDate);
+        _runtimeLabel = FormatRuntime(d.Runtime);
+        _status = d.Status;
+        _score = d.VoteAverage;
+        _voteCount = d.VoteCount;
+        _releaseLabel = !string.IsNullOrWhiteSpace(d.ReleaseDate) ? d.ReleaseDate : null;
+        _languageLabel = !string.IsNullOrWhiteSpace(d.OriginalLanguage)
+            ? (d.SpokenLanguages.FirstOrDefault()?.EnglishName ?? d.OriginalLanguage.ToUpperInvariant())
+            : null;
+        _genres = d.Genres.Where(g => !string.IsNullOrWhiteSpace(g.Name)).Select(g => g.Name!).ToList();
+
+        _videos = RankVideos((await videosTask).Results);
+
+        _stats = BuildStats();
+
+        var credits = await creditsTask;
+        var director = credits?.Crew
+            .Where(c => string.Equals(c.Job, "Director", StringComparison.OrdinalIgnoreCase))
+            .Select(c => c.Name).Where(n => !string.IsNullOrWhiteSpace(n))
+            .Distinct(StringComparer.OrdinalIgnoreCase).Take(2).ToList();
+        _directorOrCreator = director is { Count: > 0 }
+            ? new CreditGroup("Director", string.Join(", ", director))
+            : null;
+
+        _cast = credits?.Cast.OrderBy(c => c.Order).Take(15)
+            .Select(c => new CastVm(c.Name ?? "Unknown", c.Character, Tmdb.ImageUrl(c.ProfilePath, "w300")))
+            .ToList() ?? new();
+
+        _recommendations = (await recsTask).Results
+            .Where(m => !string.IsNullOrWhiteSpace(m.PosterPath)).Take(20)
+            .Select(m => new CardVm(
+                m.Title ?? m.OriginalTitle ?? "Untitled",
+                Tmdb.ImageUrl(m.PosterPath), m.Overview, YearFrom(m.ReleaseDate), m.VoteAverage,
+                $"/trailer/movie/{m.Id}", $"/watch/movie/{m.Id}", $"/details/movie/{m.Id}"))
+            .ToList();
+    }
+
+    private async Task LoadSeriesAsync()
+    {
+        var detailsTask = Tmdb.GetSeriesDetailsAsync(TmdbId);
+        var creditsTask = Tmdb.GetSeriesCreditsAsync(TmdbId);
+        var recsTask = Tmdb.GetSeriesRecommendationsAsync(TmdbId);
+        var videosTask = Tmdb.GetSeriesVideosAsync(TmdbId);
+        await Task.WhenAll(detailsTask, creditsTask, recsTask, videosTask);
+
+        var d = await detailsTask;
+        if (d is null) return;
+
+        _title = d.Name ?? d.OriginalName;
+        _tagline = d.Tagline;
+        _overview = d.Overview;
+        _posterUrl = Tmdb.ImageUrl(d.PosterPath, "w342");
+        _backdropUrl = Tmdb.ImageUrl(d.BackdropPath, "original");
+        _year = YearFrom(d.FirstAirDate);
+        var avgEp = d.EpisodeRunTime.FirstOrDefault();
+        _runtimeLabel = avgEp > 0 ? $"~{avgEp} min/ep" : null;
+        _status = d.Status;
+        _score = d.VoteAverage;
+        _voteCount = d.VoteCount;
+        _seasonsCount = d.NumberOfSeasons ?? 0;
+        _episodesCount = d.NumberOfEpisodes ?? 0;
+        _releaseLabel = !string.IsNullOrWhiteSpace(d.FirstAirDate) ? d.FirstAirDate : null;
+        _languageLabel = !string.IsNullOrWhiteSpace(d.OriginalLanguage) ? d.OriginalLanguage!.ToUpperInvariant() : null;
+        _genres = d.Genres.Where(g => !string.IsNullOrWhiteSpace(g.Name)).Select(g => g.Name!).ToList();
+
+        _videos = RankVideos((await videosTask).Results);
+
+        _stats = BuildStats();
+
+        var credits = await creditsTask;
+        var creators = d.CreatedBy.Where(c => !string.IsNullOrWhiteSpace(c.Name)).Select(c => c.Name!).Take(2).ToList();
+        if (creators.Count == 0)
+        {
+            creators = credits?.Crew
+                .Where(c => string.Equals(c.Job, "Executive Producer", StringComparison.OrdinalIgnoreCase))
+                .Select(c => c.Name).Where(n => !string.IsNullOrWhiteSpace(n))
+                .Select(n => n!)
+                .Distinct(StringComparer.OrdinalIgnoreCase).Take(2).ToList() ?? new();
+        }
+        _directorOrCreator = creators.Count > 0
+            ? new CreditGroup(creators.Count == 1 ? "Created by" : "Creators", string.Join(", ", creators))
+            : null;
+
+        _cast = credits?.Cast.OrderBy(c => c.Order).Take(15)
+            .Select(c => new CastVm(c.Name ?? "Unknown", c.Character, Tmdb.ImageUrl(c.ProfilePath, "w300")))
+            .ToList() ?? new();
+
+        _recommendations = (await recsTask).Results
+            .Where(s => !string.IsNullOrWhiteSpace(s.PosterPath)).Take(20)
+            .Select(s => new CardVm(
+                s.Name ?? s.OriginalName ?? "Untitled",
+                Tmdb.ImageUrl(s.PosterPath), s.Overview, YearFrom(s.FirstAirDate), s.VoteAverage,
+                $"/trailer/series/{s.Id}", $"/watch/series/{s.Id}", $"/details/series/{s.Id}"))
+            .ToList();
+    }
+
+    private static string? YearFrom(string? date) =>
+        !string.IsNullOrEmpty(date) && date.Length >= 4 ? date[..4] : null;
+
+    private static string? FormatRuntime(int? minutes)
+    {
+        if (minutes is not int m || m <= 0) return null;
+        var h = m / 60;
+        var rem = m % 60;
+        return h > 0 ? (rem > 0 ? $"{h}h {rem}m" : $"{h}h") : $"{m}m";
+    }
+
+    private static string ScoreRingClass(double score) => score switch
+    {
+        >= 7.5 => "border-emerald-400/80 bg-emerald-400/10 text-emerald-200",
+        >= 6.0 => "border-amber-300/80 bg-amber-300/10 text-amber-100",
+        > 0    => "border-rose-400/80 bg-rose-400/10 text-rose-200",
+        _      => "border-line bg-surface-2 text-muted",
+    };
+
+    private static string ScoreLabel(double score) => score switch
+    {
+        >= 8.0 => "Outstanding",
+        >= 7.0 => "Highly rated",
+        >= 6.0 => "Well received",
+        >= 5.0 => "Mixed reception",
+        > 0    => "Below average",
+        _      => "Not yet rated",
+    };
+
+    /// <summary>
+    /// Builds the horizontal stat chips. Each item is conditionally added so we never
+    /// render an empty chip, which keeps the hero strip dense regardless of media kind.
+    /// </summary>
+    private List<StatItem> BuildStats()
+    {
+        var stats = new List<StatItem> { new("Videos", _videos.Count.ToString()) };
+        if (_trailerCount > 0) stats.Add(new("Trailers", _trailerCount.ToString()));
+        if (_teaserCount > 0) stats.Add(new("Teasers", _teaserCount.ToString()));
+        if (_clipCount > 0) stats.Add(new("Clips", _clipCount.ToString()));
+        if (IsSeries && _seasonsCount > 0) stats.Add(new("Seasons", _seasonsCount.ToString()));
+        if (IsSeries && _episodesCount > 0) stats.Add(new("Episodes", _episodesCount.ToString()));
+        if (!string.IsNullOrWhiteSpace(_languageLabel)) stats.Add(new("Language", _languageLabel));
+        if (!string.IsNullOrWhiteSpace(_releaseLabel)) stats.Add(new(IsSeries ? "First aired" : "Released", _releaseLabel));
+        return stats;
+    }
+
+    private sealed record CastVm(string Name, string? Character, string? PhotoUrl);
+    private sealed record CardVm(string Title, string? PosterUrl, string? Overview, string? Year, double Score, string TrailerUrl, string WatchUrl, string DetailsUrl);
+    private sealed record CreditGroup(string Role, string Names);
+    private sealed record StatItem(string Label, string Value);
 }

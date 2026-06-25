@@ -229,4 +229,20 @@ whenBlazorReady(() => {
             if (!el._x_dataStack) Alpine.initTree(el);
         });
     });
+
+    // After enhanced navigation, if the URL ends in #<id>, scroll that element
+    // into view. Enhanced nav skips the browser's native fragment handling, so
+    // we re-add it here. Used by the trailer page side-panel: each video link
+    // appends `#player` so picking a clip on mobile pops the player back into
+    // view instead of leaving the user staring at the panel.
+    Blazor.addEventListener('enhancednavigationend', () => {
+        const hash = window.location.hash;
+        if (!hash || hash.length < 2) return;
+        const target = document.getElementById(hash.slice(1));
+        if (!target) return;
+        // requestAnimationFrame so the layout has settled before measuring.
+        requestAnimationFrame(() => {
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    });
 });
