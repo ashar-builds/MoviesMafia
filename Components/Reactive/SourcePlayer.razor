@@ -1,0 +1,89 @@
+@inherits ReactiveBlazor.ReactiveComponent
+@using MoviesMafia.Services.Streaming
+@inject IEmbedUrlBuilder Embed
+
+@* Source switcher: the active provider index lives in server state; clicking a
+   source button dispatches an action that morphs the iframe src in place.
+
+   IMPORTANT: [Parameter] props are NOT serialized into the reactive state token, and
+   the parent page is not re-rendered on a dispatch — so on every click TmdbId/IsSeries/
+   Season/Episode would arrive as their defaults. We therefore mirror them into plain
+   public *state* properties (MediaId/Series/SeasonNo/EpisodeNo) on the initial render,
+   and those survive each round-trip. _sources is rebuilt from that restored state. *@
+<ReactiveRoot Owner="this">
+    <div class="scroll-mt-32" id="player">
+        @if (_sources.Count == 0)
+        {
+            <div class="card p-10 text-center text-on-surface-variant">No playback sources are configured.</div>
+        }
+        else
+        {
+            @if (_sources.Count > 1)
+            {
+                <div class="mb-3 flex flex-wrap gap-2">
+                    @for (var i = 0; i < _sources.Count; i++)
+                    {
+                        var idx = i;
+                        var isActive = idx == ActiveIndex;
+                        <button type="button" data-on-click="Select" data-args="@($"[{idx}]")"
+                                class="@($"rounded-full border px-3 py-1.5 text-sm transition {(isActive ? "border-brand bg-brand/15 text-content" : "border-line bg-surface/60 text-content/70 hover:bg-surface-2/60")}")">
+                            @_sources[idx].Name
+                        </button>
+                    }
+                </div>
+            }
+            <div class="aspect-video w-full overflow-hidden rounded-xl border border-white/10 bg-black shadow-[var(--shadow-2xl)]">
+                <iframe src="@CurrentUrl" class="h-full w-full" allowfullscreen
+                        referrerpolicy="origin" ></iframe>
+            </div>
+        }
+    </div>
+</ReactiveRoot>
+
+@code {
+    // Seed values supplied by the parent page — present on the INITIAL SSR render only.
+    [Parameter] public int TmdbId { get; set; }
+    [Parameter] public bool IsSeries { get; set; }
+    [Parameter] public int Season { get; set; } = 1;
+    [Parameter] public int Episode { get; set; } = 1;
+
+    // Serialized reactive state — these DO survive every dispatch round-trip.
+    public int MediaId { get; set; }
+    public bool Series { get; set; }
+    public int SeasonNo { get; set; } = 1;
+    public int EpisodeNo { get; set; } = 1;
+    public int ActiveIndex { get; set; }
+
+    // Private field — not part of state; rebuilt from the restored identity on each render.
+    private IReadOnlyList<EmbedSource> _sources = Array.Empty<EmbedSource>();
+
+    private string CurrentUrl =>
+        _sources.Count == 0 ? "" : _sources[Math.Clamp(ActiveIndex, 0, _sources.Count - 1)].Url;
+
+    protected override void OnParametersSet()
+    {
+        // Initial render: the parent passes real parameters → copy them into state.
+        // On dispatches the parent isn't re-rendered, so TmdbId arrives as 0; keep the
+        // values rehydrated from the serialized state token instead.
+        if (TmdbId != 0)
+        {
+            MediaId = TmdbId;
+            Series = IsSeries;
+            SeasonNo = Season < 1 ? 1 : Season;
+            EpisodeNo = Episode < 1 ? 1 : Episode;
+        }
+
+        _sources = Series ? Embed.Episode(MediaId, SeasonNo, EpisodeNo) : Embed.Movie(MediaId);
+
+        // Keep the selection in range if the provider list shrank.
+        if (ActiveIndex >= _sources.Count) ActiveIndex = Math.Max(0, _sources.Count - 1);
+    }
+
+    [ReactiveAction]
+    public void Select(int index)
+    {
+        // Don't validate against _sources here: actions run BEFORE the re-render, so
+        // _sources isn't built yet. Just record the choice; OnParametersSet clamps it.
+        if (index >= 0) ActiveIndex = index;
+    }
+}

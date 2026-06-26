@@ -4,7 +4,6 @@
 @using MoviesMafia.Services.Tmdb
 @using MoviesMafia.Services.Tmdb.Dtos
 @inject ITmdbClient Tmdb
-@inject IEmbedUrlBuilder Embed
 
 <PageTitle>@(_title ?? "Watch") — MoviesMafia</PageTitle>
 
@@ -103,10 +102,9 @@ else
         <div class="grid gap-6 @(IsSeries ? "lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]" : "")">
 
             <div class="min-w-0">
-                <div id="player" class="aspect-video w-full overflow-hidden rounded-xl border border-white/10 bg-black shadow-[var(--shadow-2xl)] scroll-mt-32">
-                    <iframe src="@_embedUrl" class="h-full w-full" allowfullscreen
-                            referrerpolicy="origin" sandbox="allow-scripts allow-same-origin allow-presentation"></iframe>
-                </div>
+                @* Source switcher is its own reactive island: clicking a provider morphs the
+                   iframe in place via a server round-trip (Static SSR, no client state). *@
+                <SourcePlayer TmdbId="TmdbId" IsSeries="IsSeries" Season="SeasonNumber" Episode="EpisodeNumber" />
 
                 @if (IsSeries)
                 {
@@ -255,7 +253,6 @@ else
     [SupplyParameterFromQuery] public int Season { get; set; }
     [SupplyParameterFromQuery] public int Episode { get; set; }
 
-    private string? _embedUrl;
     private string? _title;
     private string? _overview;
     private string? _posterUrl;
@@ -300,8 +297,6 @@ else
 
     private async Task LoadMovieAsync()
     {
-        _embedUrl = Embed.Movie(TmdbId);
-
         var detailsTask = Tmdb.GetMovieDetailsAsync(TmdbId);
         var creditsTask = Tmdb.GetMovieCreditsAsync(TmdbId);
         var recsTask = Tmdb.GetMovieRecommendationsAsync(TmdbId);
@@ -340,7 +335,6 @@ else
         await Task.WhenAll(detailsTask, creditsTask, recsTask);
 
         _details = await detailsTask;
-        _embedUrl = Embed.Episode(TmdbId, SeasonNumber, EpisodeNumber);
 
         if (_details is null) return;
 

@@ -128,10 +128,6 @@ jobs:
                   "ApiKey": os.environ["TMDB_API_KEY"]
               },
           }
-
-          autoembed = os.environ.get("STREAMING_AUTOEMBED_URL", "")
-          if autoembed:
-              cfg["Streaming"] = {"AutoEmbedUrl": autoembed}
           if smtp:
               cfg["Smtp"] = smtp
           if admin:
