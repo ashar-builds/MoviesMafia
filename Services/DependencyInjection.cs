@@ -54,7 +54,18 @@ public static class DependencyInjection
         services.AddTransient<IMediaRequestRepository, MediaRequestRepository>();
         services.AddScoped<IEmailSender, SmtpEmailSender>();
         services.AddSingleton<IProfilePictureStore, FileSystemProfilePictureStore>();
+
+        // Streaming providers: held in a singleton catalog (seeded from inline config) and
+        // optionally refreshed from a remote URL by the background service below, so providers can
+        // be added/removed without a redeploy.
+        services.AddSingleton<IProviderCatalog, ProviderCatalog>();
         services.AddSingleton<IEmbedUrlBuilder, EmbedUrlBuilder>();
+        services.AddHttpClient(ProviderCatalogRefresher.HttpClientName, http =>
+        {
+            http.Timeout = TimeSpan.FromSeconds(15);
+            http.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "MoviesMafia/1.0");
+        });
+        services.AddHostedService<ProviderCatalogRefresher>();
 
         return services;
     }

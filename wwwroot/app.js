@@ -96,6 +96,28 @@ document.addEventListener('alpine:init', () => {
         }
     }));
 
+    // Ad-blocker advisory note on the watch page. Hidden once dismissed; the choice persists in
+    // localStorage so it doesn't reappear on reload or after Idiomorph subtree swaps.
+    Alpine.data('playbackTip', () => ({
+        show: false,
+        _key: 'mm.playbackTipDismissed',
+        init() {
+            try {
+                this.show = localStorage.getItem(this._key) !== '1';
+            } catch {
+                this.show = true; // storage unavailable (private mode) — just show it
+            }
+        },
+        dismiss() {
+            this.show = false;
+            try {
+                localStorage.setItem(this._key, '1');
+            } catch {
+                /* non-fatal */
+            }
+        }
+    }));
+
     // Horizontal scroll helper for media rows.
     Alpine.data('rowScroller', () => ({
         scroll(dir) {

@@ -5,8 +5,21 @@ public sealed class StreamingOptions
 {
     public const string SectionName = "Streaming";
 
-    /// <summary>Ordered list of embed providers offered as switchable sources on the player.</summary>
+    /// <summary>
+    /// Ordered list of embed providers offered as switchable sources on the player. Used as the
+    /// fallback when <see cref="ProvidersUrl"/> is unset or its first fetch hasn't succeeded yet.
+    /// </summary>
     public List<StreamingProvider> Providers { get; set; } = new();
+
+    /// <summary>
+    /// Optional URL (e.g. a GitHub Gist *raw* URL) returning a JSON array of providers. When set,
+    /// the app loads the provider list from here and refreshes it in the background, so providers
+    /// can be added/removed without a redeploy. Falls back to <see cref="Providers"/> on failure.
+    /// </summary>
+    public string? ProvidersUrl { get; set; }
+
+    /// <summary>How often to re-fetch <see cref="ProvidersUrl"/>, in minutes. Default 30.</summary>
+    public int ProvidersRefreshMinutes { get; set; } = 30;
 }
 
 /// <summary>
