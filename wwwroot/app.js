@@ -268,3 +268,33 @@ whenBlazorReady(() => {
         });
     });
 });
+
+// Session-expiry recovery for reactive dispatches.
+//
+// The library auto-reloads on a 401 (re-runs the auth pipeline → login redirect). But when the
+// auth cookie is gone, the per-user antiforgery token baked into the page no longer matches, so
+// the dispatch fails antiforgery with a 400 *before* [Authorize] is evaluated — which the library
+// only surfaces as a `reactive:error`. We treat that 400 (and 403) the same way: reload the
+// current URL so the server either redirects to login (if unauthenticated) or re-issues a fresh
+// antiforgery token (if the session is somehow still valid).
+//
+// Guarded by a short sessionStorage cooldown so a genuinely persistent 400 can't cause a reload
+// loop — at most one auto-reload per 10s window.
+document.addEventListener('reactive:error', (e) => {
+    const status = e.detail && e.detail.status;
+    if (status !== 400 && status !== 403) return;
+
+    const key = 'mm.reactiveAuthReloadAt';
+    const now = Date.now();
+    let last = 0;
+    try { last = parseInt(sessionStorage.getItem(key) || '0', 10); } catch { /* ignore */ }
+
+    if (now - last < 10000) {
+        // Already reloaded recently and still failing — don't loop. Leave the error visible.
+        console.warn('Reactive dispatch still failing after a recent reload; not reloading again.');
+        return;
+    }
+
+    try { sessionStorage.setItem(key, String(now)); } catch { /* ignore */ }
+    window.location.assign(window.location.href);
+});
