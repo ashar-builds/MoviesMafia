@@ -1,7 +1,18 @@
 @* Presentational poster card. On desktop the Trailer/Watch overlay reveals on
    hover; on touch devices (no hover) it stays visible so the actions are reachable. *@
 
-<div class="group card overflow-hidden">
+<div class="group card relative overflow-hidden">
+    @* Stretched link: makes the whole card navigate to details. It sits above the
+       poster (z-10) but below the action controls (z-20), which re-enable their own
+       pointer events so Trailer/Watch/info keep working. No <a> nesting — this is a
+       sibling overlay, not an ancestor. *@
+    @if (!string.IsNullOrWhiteSpace(DetailsUrl))
+    {
+        <a href="@DetailsUrl"
+           class="absolute inset-0 z-10 rounded-card focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/60"
+           aria-label="View details for @Title"></a>
+    }
+
     <div class="relative aspect-[2/3] overflow-hidden bg-surface-2">
         @if (PosterUrl is not null)
         {
@@ -23,15 +34,20 @@
         }
 
         @* Overlay: gradient + overview + action buttons. Visible by default (touch),
-           hover-reveal from sm: up where a pointer exists. *@
-        <div class="absolute inset-0 flex flex-col justify-end gap-3 bg-gradient-to-t from-ink via-ink/80 to-transparent p-3 opacity-100 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100">
+           hover-reveal from sm: up where a pointer exists.
+           The container is pointer-events-none so its gradient/overview never blocks
+           the stretched details link — only the button row below re-enables clicks. *@
+        <div class="pointer-events-none absolute inset-0 z-20 flex flex-col justify-end gap-3 bg-gradient-to-t from-ink via-ink/80 to-transparent p-3 opacity-100 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100">
             @if (!string.IsNullOrWhiteSpace(Overview))
             {
                 <p class="hidden line-clamp-4 text-xs text-content/90 sm:block">@Overview</p>
             }
-            @* whitespace-nowrap + min-w-0 prevents the play glyph from wrapping below
+            @* Only this row captures clicks (the rest of the poster falls through to the
+               details link). On touch it's always interactive; from sm: up only on hover,
+               so an invisible strip doesn't swallow clicks meant for details.
+               whitespace-nowrap + min-w-0 prevents the play glyph from wrapping below
                the label on narrow cards (e.g. the 160px home-row cards). *@
-            <div class="flex gap-2">
+            <div class="pointer-events-auto flex gap-2 sm:pointer-events-none sm:group-hover:pointer-events-auto">
                 <a href="@TrailerUrl" class="btn-ghost min-w-0 flex-1 whitespace-nowrap px-2 py-2 text-xs sm:py-1.5">Trailer</a>
                 <a href="@WatchUrl" class="btn-primary min-w-0 flex-1 whitespace-nowrap px-2 py-2 text-xs sm:py-1.5">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -59,7 +75,7 @@
             @if (!string.IsNullOrWhiteSpace(DetailsUrl))
             {
                 <a href="@DetailsUrl"
-                   class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-line bg-surface-2/60 text-content/80 transition hover:border-brand hover:bg-brand/10 hover:text-brand"
+                   class="relative z-20 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-line bg-surface-2/60 text-content/80 transition hover:border-brand hover:bg-brand/10 hover:text-brand"
                    title="More info about @Title"
                    aria-label="More info about @Title">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">

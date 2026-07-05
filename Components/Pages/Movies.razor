@@ -1,44 +1,40 @@
 @page "/movies"
+@attribute [StreamRendering]
 @using MoviesMafia.Services.Tmdb
 @using MoviesMafia.Services.Tmdb.Dtos
 @inject ITmdbClient Tmdb
 
 <PageTitle>Movies — MoviesMafia</PageTitle>
 
-<HeroCarousel Slides="_hero" />
+<HeroCarousel Slides="_hero" Loading="_heroLoading" />
 
 <div class="w-full px-4 pb-16 sm:px-6 lg:px-10">
 
-    @if (_loadError is not null)
-    {
-        <StatusMessage IsError="true" Message="@_loadError" />
-    }
-
     <TrendingSection Kind="movies" />
 
-    <MediaRow Title="Popular movies" Subtitle="Loved by everyone">
-        @foreach (var m in _popular)
+    <MediaRow Title="Popular movies" Subtitle="Loved by everyone" Loading="_popular is null">
+        @foreach (var m in _popular ?? Empty())
         {
             @Card(m)
         }
     </MediaRow>
 
-    <MediaRow Title="Now playing in theaters" Subtitle="Catch the latest releases">
-        @foreach (var m in _nowPlaying)
+    <MediaRow Title="Now playing in theaters" Subtitle="Catch the latest releases" Loading="_nowPlaying is null">
+        @foreach (var m in _nowPlaying ?? Empty())
         {
             @Card(m)
         }
     </MediaRow>
 
-    <MediaRow Title="Top rated movies" Subtitle="The all-time greats according to TMDB">
-        @foreach (var m in _topRated)
+    <MediaRow Title="Top rated movies" Subtitle="The all-time greats according to TMDB" Loading="_topRated is null">
+        @foreach (var m in _topRated ?? Empty())
         {
             @Card(m)
         }
     </MediaRow>
 
-    <MediaRow Title="Upcoming movies" Subtitle="Mark your calendar">
-        @foreach (var m in _upcoming)
+    <MediaRow Title="Upcoming movies" Subtitle="Mark your calendar" Loading="_upcoming is null">
+        @foreach (var m in _upcoming ?? Empty())
         {
             @Card(m)
         }
@@ -49,35 +45,33 @@
     private const int RowSize = HomeMappers.RowSize;
 
     private List<HeroSlide> _hero = new();
-    private List<MovieResult> _popular = new();
-    private List<MovieResult> _nowPlaying = new();
-    private List<MovieResult> _topRated = new();
-    private List<MovieResult> _upcoming = new();
-    private string? _loadError;
+    private bool _heroLoading = true;
+    private List<MovieResult>? _popular;
+    private List<MovieResult>? _nowPlaying;
+    private List<MovieResult>? _topRated;
+    private List<MovieResult>? _upcoming;
 
     protected override async Task OnInitializedAsync()
     {
+        await Task.WhenAll(
+            LoadHeroAsync(),
+            HomeMappers.LoadRow(async () => (await Tmdb.GetPopularMoviesAsync()).Results.Take(RowSize).ToList(), r => _popular = r),
+            HomeMappers.LoadRow(async () => (await Tmdb.GetNowPlayingMoviesAsync()).Results.Take(RowSize).ToList(), r => _nowPlaying = r),
+            HomeMappers.LoadRow(async () => (await Tmdb.GetTopRatedMoviesAsync()).Results.Take(RowSize).ToList(), r => _topRated = r),
+            HomeMappers.LoadRow(async () => (await Tmdb.GetUpcomingMoviesAsync()).Results.Take(RowSize).ToList(), r => _upcoming = r));
+    }
+
+    private async Task LoadHeroAsync()
+    {
         try
         {
-            var heroTask = Tmdb.GetTrendingMoviesAsync("day");
-            var popularTask = Tmdb.GetPopularMoviesAsync();
-            var nowPlayingTask = Tmdb.GetNowPlayingMoviesAsync();
-            var topRatedTask = Tmdb.GetTopRatedMoviesAsync();
-            var upcomingTask = Tmdb.GetUpcomingMoviesAsync();
-
-            await Task.WhenAll(heroTask, popularTask, nowPlayingTask, topRatedTask, upcomingTask);
-
-            _hero = HomeMappers.ToHeroSlides((await heroTask).Results, Tmdb, "Trending movie");
-            _popular = (await popularTask).Results.Take(RowSize).ToList();
-            _nowPlaying = (await nowPlayingTask).Results.Take(RowSize).ToList();
-            _topRated = (await topRatedTask).Results.Take(RowSize).ToList();
-            _upcoming = (await upcomingTask).Results.Take(RowSize).ToList();
+            _hero = HomeMappers.ToHeroSlides((await Tmdb.GetTrendingMoviesAsync("day")).Results, Tmdb, "Trending movie");
         }
-        catch
-        {
-            _loadError = "We couldn't load movies right now. Please try again shortly.";
-        }
+        catch { /* hero carousel renders its own empty state */ }
+        finally { _heroLoading = false; }
     }
+
+    private static IEnumerable<MovieResult> Empty() => [];
 
     private RenderFragment Card(MovieResult m) =>
         @<div class="w-44 shrink-0 snap-start sm:w-52">

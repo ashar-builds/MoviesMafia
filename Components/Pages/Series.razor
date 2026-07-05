@@ -1,44 +1,40 @@
 @page "/series"
+@attribute [StreamRendering]
 @using MoviesMafia.Services.Tmdb
 @using MoviesMafia.Services.Tmdb.Dtos
 @inject ITmdbClient Tmdb
 
 <PageTitle>Series — MoviesMafia</PageTitle>
 
-<HeroCarousel Slides="_hero" />
+<HeroCarousel Slides="_hero" Loading="_heroLoading" />
 
 <div class="w-full px-4 pb-16 sm:px-6 lg:px-10">
 
-    @if (_loadError is not null)
-    {
-        <StatusMessage IsError="true" Message="@_loadError" />
-    }
-
     <TrendingSection Kind="series" />
 
-    <MediaRow Title="Popular series" Subtitle="The shows everyone's binging">
-        @foreach (var s in _popular)
+    <MediaRow Title="Popular series" Subtitle="The shows everyone's binging" Loading="_popular is null">
+        @foreach (var s in _popular ?? Empty())
         {
             @Card(s)
         }
     </MediaRow>
 
-    <MediaRow Title="On the air" Subtitle="Series with new episodes airing now">
-        @foreach (var s in _onTheAir)
+    <MediaRow Title="On the air" Subtitle="Series with new episodes airing now" Loading="_onTheAir is null">
+        @foreach (var s in _onTheAir ?? Empty())
         {
             @Card(s)
         }
     </MediaRow>
 
-    <MediaRow Title="Airing today" Subtitle="Fresh episodes in the next 24 hours">
-        @foreach (var s in _airingToday)
+    <MediaRow Title="Airing today" Subtitle="Fresh episodes in the next 24 hours" Loading="_airingToday is null">
+        @foreach (var s in _airingToday ?? Empty())
         {
             @Card(s)
         }
     </MediaRow>
 
-    <MediaRow Title="Top rated series" Subtitle="Binge-worthy classics">
-        @foreach (var s in _topRated)
+    <MediaRow Title="Top rated series" Subtitle="Binge-worthy classics" Loading="_topRated is null">
+        @foreach (var s in _topRated ?? Empty())
         {
             @Card(s)
         }
@@ -49,35 +45,33 @@
     private const int RowSize = HomeMappers.RowSize;
 
     private List<HeroSlide> _hero = new();
-    private List<SeriesResult> _popular = new();
-    private List<SeriesResult> _onTheAir = new();
-    private List<SeriesResult> _airingToday = new();
-    private List<SeriesResult> _topRated = new();
-    private string? _loadError;
+    private bool _heroLoading = true;
+    private List<SeriesResult>? _popular;
+    private List<SeriesResult>? _onTheAir;
+    private List<SeriesResult>? _airingToday;
+    private List<SeriesResult>? _topRated;
 
     protected override async Task OnInitializedAsync()
     {
+        await Task.WhenAll(
+            LoadHeroAsync(),
+            HomeMappers.LoadRow(async () => (await Tmdb.GetPopularSeriesAsync()).Results.Take(RowSize).ToList(), r => _popular = r),
+            HomeMappers.LoadRow(async () => (await Tmdb.GetOnTheAirSeriesAsync()).Results.Take(RowSize).ToList(), r => _onTheAir = r),
+            HomeMappers.LoadRow(async () => (await Tmdb.GetAiringTodaySeriesAsync()).Results.Take(RowSize).ToList(), r => _airingToday = r),
+            HomeMappers.LoadRow(async () => (await Tmdb.GetTopRatedSeriesAsync()).Results.Take(RowSize).ToList(), r => _topRated = r));
+    }
+
+    private async Task LoadHeroAsync()
+    {
         try
         {
-            var heroTask = Tmdb.GetTrendingSeriesAsync("day");
-            var popularTask = Tmdb.GetPopularSeriesAsync();
-            var onTheAirTask = Tmdb.GetOnTheAirSeriesAsync();
-            var airingTodayTask = Tmdb.GetAiringTodaySeriesAsync();
-            var topRatedTask = Tmdb.GetTopRatedSeriesAsync();
-
-            await Task.WhenAll(heroTask, popularTask, onTheAirTask, airingTodayTask, topRatedTask);
-
-            _hero = HomeMappers.ToHeroSlides((await heroTask).Results, Tmdb, "Trending series");
-            _popular = (await popularTask).Results.Take(RowSize).ToList();
-            _onTheAir = (await onTheAirTask).Results.Take(RowSize).ToList();
-            _airingToday = (await airingTodayTask).Results.Take(RowSize).ToList();
-            _topRated = (await topRatedTask).Results.Take(RowSize).ToList();
+            _hero = HomeMappers.ToHeroSlides((await Tmdb.GetTrendingSeriesAsync("day")).Results, Tmdb, "Trending series");
         }
-        catch
-        {
-            _loadError = "We couldn't load series right now. Please try again shortly.";
-        }
+        catch { /* hero carousel renders its own empty state */ }
+        finally { _heroLoading = false; }
     }
+
+    private static IEnumerable<SeriesResult> Empty() => [];
 
     private RenderFragment Card(SeriesResult s) =>
         @<div class="w-44 shrink-0 snap-start sm:w-52">

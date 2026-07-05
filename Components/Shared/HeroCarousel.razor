@@ -9,7 +9,27 @@
    navigation the DOM is morphed in place and Alpine's transition queue can be
    interrupted, leaving multiple slides stuck visible. Opacity is deterministic. *@
 
-@if (Slides.Count > 0)
+@if (Slides.Count == 0 && Loading)
+{
+    @* Hero-shaped placeholder so the page doesn't jump when the real hero streams in. *@
+    <section class="relative w-full overflow-hidden bg-ink" aria-hidden="true">
+        <div class="skeleton h-[80vh] max-h-[780px] min-h-[420px] w-full rounded-none sm:min-h-[560px]">
+            <div class="absolute inset-0 flex items-end pb-20 sm:items-center sm:pb-0">
+                <div class="w-full max-w-3xl space-y-4 px-6 sm:px-12">
+                    <div class="skeleton h-6 w-28"></div>
+                    <div class="skeleton h-12 w-3/4"></div>
+                    <div class="skeleton h-4 w-full max-w-xl"></div>
+                    <div class="skeleton h-4 w-2/3 max-w-md"></div>
+                    <div class="flex gap-3 pt-2">
+                        <div class="skeleton h-10 w-32"></div>
+                        <div class="skeleton h-10 w-32"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+}
+else if (Slides.Count > 0)
 {
     <section class="relative w-full overflow-hidden bg-ink"
              x-data="heroCarousel(@Slides.Count)"
@@ -118,4 +138,7 @@
 
 @code {
     [Parameter, EditorRequired] public IReadOnlyList<HeroSlide> Slides { get; set; } = [];
+
+    /// <summary>When true and no slides are loaded yet, renders a hero-shaped skeleton.</summary>
+    [Parameter] public bool Loading { get; set; }
 }

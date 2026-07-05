@@ -49,8 +49,14 @@ document.addEventListener('alpine:init', () => {
         _settleTimer: null,
         init() {
             this.items = this._load();
-            // After each reactive morph, record the *settled* query — wait for
-            // typing to stop so prefixes ("bat", "batm") don't get stored.
+            // A navbar search seeds the box via SSR (value="@Query") without any reactive
+            // dispatch, so record that seeded query right away — otherwise searches started
+            // from the navbar never land in recent searches. On a navbar-search morph this
+            // whole subtree is destroyed + re-inited (see enhancednavigationend), so init
+            // re-runs and re-records the new seed each time.
+            this._record();
+            // After each reactive morph, record the *settled* query — wait for typing to
+            // stop so prefixes ("bat", "batm") don't get stored.
             this.$root.addEventListener('reactive:updated', () => this._scheduleRecord());
         },
         _scheduleRecord() {
@@ -217,6 +223,27 @@ function whenBlazorReady(callback) {
     }, 50);
 }
 
+// The navbar quick-search submits a GET form to /search?q=<term> purely to *seed*
+// the reactive SearchBox on its first render. Once the server has rendered those
+// results, the ?q= is redundant — and worse, misleading: the in-page search box
+// runs its own live searches over the reactive channel and never touches the URL,
+// so a stale ?q=batman would still be there after the user searched "spiderman".
+// Strip it (no reload — history.replaceState) so the shared/bookmarked URL is just
+// "/search" and never lies about the current query.
+function stripSearchSeedQuery() {
+    if (window.location.pathname !== '/search') return;
+    if (!window.location.search) return;
+    const url = window.location.pathname + window.location.hash;
+    try {
+        history.replaceState(history.state, '', url);
+    } catch {
+        /* replaceState unavailable — non-fatal, the seed just stays in the URL */
+    }
+}
+
+// Fresh full-page load of /search?q=... (no enhanced-nav event fires for this).
+stripSearchSeedQuery();
+
 whenBlazorReady(() => {
     // Drive the bar from Blazor's enhanced-navigation lifecycle.
     Blazor.addEventListener('enhancednavigationstart', () => {
@@ -227,10 +254,28 @@ whenBlazorReady(() => {
         // morph could even leave it open on the next page.
         const header = document.querySelector('[data-nav-header]');
         if (header?._x_dataStack) {
-            Alpine.evaluate(header, 'open = false');
+            // Collapse both the mobile dropdown and the mobile search bar on nav.
+            Alpine.evaluate(header, 'open = false; search = false');
         }
     });
-    Blazor.addEventListener('enhancednavigationend', () => navProgress.complete());
+    Blazor.addEventListener('enhancednavigationend', () => {
+        navProgress.complete();
+        // Navbar quick-search lands here via enhanced nav — drop the seed ?q=.
+        stripSearchSeedQuery();
+        // A navbar search that lands on /search enhanced-nav-morphs this page. The
+        // recent-searches element survives the morph, but Idiomorph detaches Alpine's
+        // directives on it — leaving x-if/x-for/x-show stale so the chips vanish. Give
+        // it a clean slate: tear the Alpine tree down and re-init it, which rebuilds the
+        // declarative bindings from localStorage and re-records the freshly-seeded query
+        // (via the factory's init → _record).
+        if (typeof Alpine !== 'undefined') {
+            const recent = document.querySelector('[x-data="recentSearches"]');
+            if (recent?._x_dataStack) {
+                Alpine.destroyTree(recent);
+                Alpine.initTree(recent);
+            }
+        }
+    });
 
     // Blazor Enhanced Navigation morphs the DOM in place. Alpine only scans for
     // `x-data` on its initial boot, so components inserted by a page swap arrive
