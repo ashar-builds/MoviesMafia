@@ -1,60 +1,203 @@
 @page "/account/profile"
 @attribute [Authorize]
 @using Microsoft.AspNetCore.Identity
+@using MoviesMafia.Domain
 @using MoviesMafia.Domain.Entities
+@using MoviesMafia.Services.Repositories
 @using MoviesMafia.Services.Storage
 @inject UserManager<AppUser> UserManager
 @inject IProfilePictureStore Avatars
+@inject IMediaRequestRepository Requests
 @inject AuthenticationStateProvider AuthState
 
-<PageTitle>Profile — MoviesMafia</PageTitle>
+<PageTitle>Your profile — MoviesMafia</PageTitle>
 
-<div class="w-full px-4 py-8 sm:px-6 lg:px-10">
-<h1 class="text-3xl font-bold">Your profile</h1>
+<div class="w-full px-4 pb-16 sm:px-6 lg:px-10"
+     x-data="{ tab: 'overview' }">
 
-<div class="mt-6 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-    <!-- Identity + avatar -->
-    <section class="card p-6">
-        <div class="flex items-center gap-4">
-            <img src="@Avatars.PublicPath(_user?.ProfilePictureFileName)" alt="Avatar"
-                 class="h-20 w-20 shrink-0 rounded-full border border-white/10 object-cover" />
-            <div class="min-w-0">
-                <p class="truncate text-lg font-semibold">@_user?.UserName</p>
-                <p class="truncate text-sm text-on-surface-variant">@_user?.Email</p>
+    @* ---------- Cover banner + identity header ---------- *@
+    <section class="relative mt-6 overflow-hidden rounded-2xl border border-line">
+        @* Decorative gradient cover. *@
+        <div class="h-32 w-full bg-gradient-to-r from-brand/40 via-brand-strong/20 to-accent/20 sm:h-40"></div>
+
+        <div class="px-4 pb-5 sm:px-6">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div class="flex items-end gap-4">
+                    @* Avatar overlaps the cover. *@
+                    <div class="-mt-12 shrink-0 sm:-mt-14">
+                        <img src="@Avatars.PublicPath(_user?.ProfilePictureFileName)" alt="@(_user?.UserName) avatar"
+                             class="h-24 w-24 rounded-2xl border-4 border-surface object-cover shadow-[var(--shadow-2xl)] sm:h-28 sm:w-28" />
+                    </div>
+                    <div class="min-w-0 pb-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <h1 class="truncate text-2xl font-bold sm:text-3xl">@_user?.UserName</h1>
+                            @foreach (var role in _roles)
+                            {
+                                <span class="@RoleBadgeClass(role)">@role</span>
+                            }
+                        </div>
+                        <p class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-on-surface-variant">
+                            <span class="inline-flex items-center gap-1.5">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                    <path d="M3 4a2 2 0 00-2 2v1.161l8.441 4.221a1.25 1.25 0 001.118 0L19 7.162V6a2 2 0 00-2-2H3z" />
+                                    <path d="M19 8.839l-7.77 3.885a2.75 2.75 0 01-2.46 0L1 8.839V14a2 2 0 002 2h14a2 2 0 002-2V8.839z" />
+                                </svg>
+                                @_user?.Email
+                            </span>
+                            @if (_emailConfirmed)
+                            {
+                                <span class="inline-flex items-center gap-1 text-emerald-400">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                        <path fill-rule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-7.5 7.5a1 1 0 01-1.4 0l-3.5-3.5a1 1 0 111.4-1.4l2.8 2.79 6.8-6.79a1 1 0 011.4 0z" clip-rule="evenodd" />
+                                    </svg>
+                                    Verified
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="inline-flex items-center gap-1 text-amber-400">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                        <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.515 2.625H3.72c-1.345 0-2.188-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+                                    </svg>
+                                    Email not verified
+                                </span>
+                            }
+                        </p>
+                    </div>
+                </div>
+
+                @* Quick actions. *@
+                <div class="flex shrink-0 items-center gap-2">
+                    <a href="/search" class="btn-ghost">Discover</a>
+                    <form method="post" action="/account/logout">
+                        <AntiforgeryToken />
+                        <button type="submit" class="btn-subtle">Sign out</button>
+                    </form>
+                </div>
+            </div>
+
+            @* Stats row. *@
+            <div class="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div class="rounded-xl border border-line bg-surface-2/40 p-3">
+                    <p class="text-2xl font-bold">@_requestCount</p>
+                    <p class="text-xs text-on-surface-variant">Title requests</p>
+                </div>
+                <div class="rounded-xl border border-line bg-surface-2/40 p-3">
+                    <p class="text-2xl font-bold">@(_roles.Contains(Roles.Admin) ? "Admin" : "Member")</p>
+                    <p class="text-xs text-on-surface-variant">Account type</p>
+                </div>
+                <div class="rounded-xl border border-line bg-surface-2/40 p-3">
+                    <p class="truncate text-2xl font-bold">@MemberSince</p>
+                    <p class="text-xs text-on-surface-variant">Member since</p>
+                </div>
+                <div class="rounded-xl border border-line bg-surface-2/40 p-3">
+                    <p class="text-2xl font-bold @(_emailConfirmed ? "text-emerald-400" : "text-amber-400")">
+                        @(_emailConfirmed ? "Active" : "Pending")
+                    </p>
+                    <p class="text-xs text-on-surface-variant">Status</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    @* Flash messages from the avatar endpoint redirect. *@
+    <div class="mt-4">
+        <StatusMessage IsError="true" Message="@Error" />
+        <StatusMessage Message="@Message" />
+    </div>
+
+    @* ---------- Tabs ---------- *@
+    <div class="mt-6 flex gap-1 border-b border-line">
+        @foreach (var (key, label) in Tabs)
+        {
+            <button type="button" x-on:click="tab = '@key'"
+                    class="relative -mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition"
+                    x-bind:class="tab === '@key' ? 'border-brand text-content' : 'border-transparent text-on-surface-variant hover:text-content'">
+                @label
+            </button>
+        }
+    </div>
+
+    @* ---------- Tab panels ---------- *@
+    <div class="mt-6">
+
+        @* --- Overview --- *@
+        <div x-show="tab === 'overview'" x-cloak>
+            <div class="grid gap-6 lg:grid-cols-3">
+                <section class="card p-6 lg:col-span-1">
+                    <h2 class="font-semibold">Profile picture</h2>
+                    <p class="mt-1 text-sm text-on-surface-variant">Upload a square image (PNG or JPG) for best results.</p>
+                    <div class="mt-4 flex items-center gap-4">
+                        <img src="@Avatars.PublicPath(_user?.ProfilePictureFileName)" alt="Current avatar"
+                             class="h-16 w-16 shrink-0 rounded-xl border border-white/10 object-cover" />
+                        <form method="post" action="/account/avatar" enctype="multipart/form-data" class="min-w-0 flex-1 space-y-2"
+                              x-data x-init="$el.querySelector('input[type=file]').addEventListener('change', () => $el.requestSubmit())">
+                            <AntiforgeryToken />
+                            <input class="input file:mr-3 file:rounded file:border-0 file:bg-surface-container-high file:px-3 file:py-1 file:text-on-surface"
+                                   name="profilePicture" type="file" accept="image/*" aria-label="Choose a new profile picture" />
+                            <noscript><button type="submit" class="btn-ghost w-full">Upload</button></noscript>
+                        </form>
+                    </div>
+                </section>
+
+                <section class="card p-6 lg:col-span-2">
+                    <h2 class="font-semibold">Account details</h2>
+                    <dl class="mt-4 grid gap-x-6 gap-y-4 sm:grid-cols-2">
+                        <div>
+                            <dt class="text-xs uppercase tracking-wide text-on-surface-variant">Username</dt>
+                            <dd class="mt-1 text-sm font-medium">@_user?.UserName</dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs uppercase tracking-wide text-on-surface-variant">Email</dt>
+                            <dd class="mt-1 truncate text-sm font-medium">@_user?.Email</dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs uppercase tracking-wide text-on-surface-variant">Roles</dt>
+                            <dd class="mt-1 text-sm font-medium">@(_roles.Count > 0 ? string.Join(", ", _roles) : "—")</dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs uppercase tracking-wide text-on-surface-variant">Member since</dt>
+                            <dd class="mt-1 text-sm font-medium">@_user?.CreatedAt.ToString("MMMM d, yyyy")</dd>
+                        </div>
+                    </dl>
+                </section>
             </div>
         </div>
 
-        <StatusMessage IsError="true" Message="@Error" />
-        <StatusMessage Message="@Message" />
-
-        <!-- Avatar upload posts to a real endpoint (file upload + cookie-safe). -->
-        <form method="post" action="/account/avatar" enctype="multipart/form-data" class="mt-5 space-y-3"
-              x-data x-init="$el.querySelector('input[type=file]').addEventListener('change', e => $el.requestSubmit())">
-            <AntiforgeryToken />
-            <label class="label">Change profile picture</label>
-            <input class="input file:mr-3 file:rounded file:border-0 file:bg-surface-container-high file:px-3 file:py-1 file:text-on-surface"
-                   name="profilePicture" type="file" accept="image/*" />
-            <noscript><button type="submit" class="btn-ghost w-full">Upload</button></noscript>
-        </form>
-    </section>
-
-    <!-- Change password (ReactiveBlazor) -->
-    <section class="card p-6">
-        <h2 class="font-semibold">Change password</h2>
-        <div class="mt-4">
-            <UpdatePasswordForm />
+        @* --- Requests --- *@
+        <div x-show="tab === 'requests'" x-cloak>
+            <div class="grid gap-6 lg:grid-cols-2">
+                <RequestMediaForm />
+                <section class="card p-6">
+                    <MediaRequestList />
+                </section>
+            </div>
         </div>
-    </section>
 
-    <!-- Request a title (ReactiveBlazor) -->
-    <section>
-        <RequestMediaForm />
-    </section>
-</div>
+        @* --- Security --- *@
+        <div x-show="tab === 'security'" x-cloak>
+            <div class="grid gap-6 lg:grid-cols-2">
+                <section class="card p-6">
+                    <h2 class="font-semibold">Change password</h2>
+                    <p class="mt-1 text-sm text-on-surface-variant">Use a strong password you don't reuse elsewhere.</p>
+                    <div class="mt-4">
+                        <UpdatePasswordForm />
+                    </div>
+                </section>
+                <section class="card p-6">
+                    <h2 class="font-semibold">Sessions</h2>
+                    <p class="mt-1 text-sm text-on-surface-variant">
+                        You're signed in on this device. Signing out ends your session here.
+                    </p>
+                    <form method="post" action="/account/logout" class="mt-4">
+                        <AntiforgeryToken />
+                        <button type="submit" class="btn-ghost">Sign out of this device</button>
+                    </form>
+                </section>
+            </div>
+        </div>
 
-<section class="card mt-6 p-6">
-    <MediaRequestList />
-</section>
+    </div>
 </div>
 
 @code {
@@ -62,14 +205,40 @@
     [SupplyParameterFromQuery] public string? Message { get; set; }
 
     private AppUser? _user;
+    private IList<string> _roles = [];
+    private bool _emailConfirmed;
+    private int _requestCount;
+
+    private static readonly (string Key, string Label)[] Tabs =
+    [
+        ("overview", "Overview"),
+        ("requests", "Requests"),
+        ("security", "Security"),
+    ];
+
+    private string MemberSince => _user?.CreatedAt.ToString("MMM yyyy") ?? "—";
 
     protected override async Task OnInitializedAsync()
     {
         var state = await AuthState.GetAuthenticationStateAsync();
         var name = state.User.Identity?.Name;
-        if (name is not null)
+        if (name is null)
         {
-            _user = await UserManager.FindByNameAsync(name);
+            return;
         }
+
+        _user = await UserManager.FindByNameAsync(name);
+        if (_user is null)
+        {
+            return;
+        }
+
+        _roles = await UserManager.GetRolesAsync(_user);
+        _emailConfirmed = _user.EmailConfirmed;
+        _requestCount = (await Requests.GetByUserAsync(_user.Id)).Count;
     }
+
+    private static string RoleBadgeClass(string role) => role == Roles.Admin
+        ? "chip border-brand/50 bg-brand/15 text-content"
+        : "chip";
 }
