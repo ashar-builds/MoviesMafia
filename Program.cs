@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
@@ -46,8 +47,14 @@ builder.Services.AddCascadingAuthenticationState();
 // Blazor Static SSR (no interactive render modes — interactivity is provided by ReactiveBlazor).
 builder.Services.AddRazorComponents();
 
-// ReactiveBlazor encrypts component state with ASP.NET Data Protection.
-builder.Services.AddDataProtection();
+// ReactiveBlazor encrypts component state, and Identity encrypts the auth cookie, with
+// ASP.NET Data Protection. Persist the key ring in Postgres (via AppDbContext) and pin the
+// application name, so keys survive app restarts/redeploys and are shared across all instances.
+// Without this the ring lands on the container's ephemeral filesystem, regenerates on restart,
+// and logs everyone out — long before the 30-day cookie would expire.
+builder.Services.AddDataProtection()
+    .SetApplicationName("MoviesMafia")
+    .PersistKeysToDbContext<AppDbContext>();
 builder.Services.AddReactiveComponents(assemblies: typeof(Program).Assembly);
 
 var app = builder.Build();

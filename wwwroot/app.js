@@ -206,6 +206,39 @@ const navProgress = (() => {
     return { start, complete };
 })();
 
+// ---------------------------------------------------------------------------
+// Reactive-dispatch progress: reuse the SAME top bar as navigation.
+// ReactiveBlazor sets [data-reactive-busy] on a component root for the duration
+// of a dispatch (source switching, Discover filters/collections, forms, admin,
+// etc.) and clears it when done — in success AND error paths. A MutationObserver
+// on that attribute gives us both the start and the end signal, so the existing
+// navProgress bar can represent reactive activity too. We count busy roots so
+// overlapping dispatches don't finish the bar early.
+// ---------------------------------------------------------------------------
+function wireReactiveProgress() {
+    const busyCount = () => document.querySelectorAll('[data-reactive-busy]').length;
+    let wasBusy = false;
+
+    const sync = () => {
+        const busy = busyCount() > 0;
+        if (busy && !wasBusy) navProgress.start();
+        else if (!busy && wasBusy) navProgress.complete();
+        wasBusy = busy;
+    };
+
+    new MutationObserver(sync).observe(document.body, {
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['data-reactive-busy'],
+    });
+}
+
+if (document.body) {
+    wireReactiveProgress();
+} else {
+    document.addEventListener('DOMContentLoaded', wireReactiveProgress);
+}
+
 // This file is loaded synchronously in <head> (so the alpine:init factories
 // above are registered before Alpine boots), but blazor.web.js loads at the
 // end of <body>. So the `Blazor` global doesn't exist when this script runs —

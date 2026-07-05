@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -6,7 +7,11 @@ using MoviesMafia.Domain.Entities;
 
 namespace MoviesMafia.Data;
 
-public class AppDbContext : IdentityDbContext<AppUser>
+// Implements IDataProtectionKeyContext so the Data Protection key ring is stored in Postgres.
+// Keys then survive app restarts and are shared across all instances — without this, keys land
+// on the container's ephemeral filesystem, regenerate on every restart, and log everyone out
+// (auth cookie + ReactiveBlazor state tokens are both DP-encrypted).
+public class AppDbContext : IdentityDbContext<AppUser>, IDataProtectionKeyContext
 {
     private readonly IHttpContextAccessor _httpContextAccessor;
 
@@ -17,6 +22,9 @@ public class AppDbContext : IdentityDbContext<AppUser>
     }
 
     public DbSet<MediaRequest> MediaRequests => Set<MediaRequest>();
+
+    /// <summary>Data Protection key ring, persisted in the database.</summary>
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

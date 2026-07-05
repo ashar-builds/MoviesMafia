@@ -1,48 +1,181 @@
 @page "/about"
 
-<PageTitle>About — MoviesMafia</PageTitle>
+<PageTitle>About MoviesMafia — Free Movie &amp; TV Series Discovery and Streaming</PageTitle>
 
-<div class="w-full px-4 py-8 sm:px-6 lg:px-10">
-<div class="mx-auto max-w-3xl">
-    <h1 class="text-3xl font-bold">About MoviesMafia</h1>
-    <p class="mt-4 text-on-surface-variant">
-        MoviesMafia is a movie and series discovery app powered by The Movie Database (TMDB).
-        It's also a working showcase for <span class="text-on-surface font-medium">ReactiveBlazor</span> —
-        stateful, interactive components on Blazor Static SSR with no SignalR circuit and no WebAssembly.
-    </p>
+@* SEO: description + Open Graph/Twitter cards + JSON-LD structured data. Injected
+   into <head> via HeadOutlet (see App.razor). This is the app's richest static page,
+   so it's the best crawl target for what MoviesMafia is. *@
+<HeadContent>
+    <meta name="description" content="MoviesMafia is a free movie and TV series discovery app powered by TMDB. Browse Hollywood, Bollywood, Marvel, DC, anime and more, watch trailers, and stream titles — no sign-up to explore." />
+    <meta name="keywords" content="movies, tv series, streaming, watch movies online, movie trailers, TMDB, Bollywood, Hollywood, Marvel, DC, anime, discover movies" />
+    <link rel="canonical" href="https://moviesmafia.app/about" />
 
-    <div class="mt-8 grid gap-4 sm:grid-cols-3">
-        @foreach (var f in Features)
-        {
-            <div class="card p-5">
-                <div class="text-2xl">@f.Icon</div>
-                <h3 class="mt-3 font-semibold">@f.Title</h3>
-                <p class="mt-1 text-sm text-on-surface-variant">@f.Body</p>
-            </div>
-        }
-    </div>
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="MoviesMafia" />
+    <meta property="og:title" content="MoviesMafia — Discover &amp; Stream Movies and TV Series" />
+    <meta property="og:description" content="Browse and stream movies and series across Hollywood, Bollywood, Marvel, DC, anime and more. Trailers, ratings, cast and multiple sources." />
+    <meta property="og:url" content="https://moviesmafia.app/about" />
 
-    <div class="card mt-8 p-6">
-        <h2 class="font-semibold">Built with</h2>
-        <div class="mt-3 flex flex-wrap gap-2">
-            <span class="chip">Blazor Static SSR · .NET 10</span>
-            <span class="chip">ReactiveBlazor</span>
-            <span class="chip">Tailwind CSS v4</span>
-            <span class="chip">Alpine.js</span>
-            <span class="chip">PostgreSQL · EF Core</span>
-            <span class="chip">TMDB API</span>
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="MoviesMafia — Discover &amp; Stream Movies and TV Series" />
+    <meta name="twitter:description" content="Browse and stream movies and series across Hollywood, Bollywood, Marvel, DC, anime and more." />
+
+    <script type="application/ld+json">
+    {
+      "@@context": "https://schema.org",
+      "@@type": "WebApplication",
+      "name": "MoviesMafia",
+      "url": "https://moviesmafia.app",
+      "applicationCategory": "EntertainmentApplication",
+      "operatingSystem": "Web",
+      "description": "A free movie and TV series discovery and streaming app powered by The Movie Database (TMDB).",
+      "offers": { "@@type": "Offer", "price": "0", "priceCurrency": "USD" }
+    }
+    </script>
+</HeadContent>
+
+<div class="w-full px-4 pb-16 sm:px-6 lg:px-10">
+
+    @* ---- Intro ---- *@
+    <header class="pt-8 sm:pt-10">
+        <h1 class="text-3xl font-bold sm:text-4xl">About MoviesMafia</h1>
+        <p class="mt-4 max-w-3xl text-base leading-relaxed text-on-surface-variant">
+            <span class="text-on-surface font-medium">MoviesMafia</span> is a free movie and TV series
+            discovery app powered by <span class="text-on-surface font-medium">The Movie Database (TMDB)</span>.
+            Search thousands of titles, browse curated collections spanning Hollywood, Bollywood, Marvel, DC,
+            anime and more, watch trailers, and stream what you find — all in a fast, modern interface with
+            nothing to install.
+        </p>
+        <p class="mt-3 max-w-3xl text-sm leading-relaxed text-on-surface-variant">
+            It's also a working showcase for <span class="text-on-surface font-medium">ReactiveBlazor</span> —
+            stateful, interactive components on Blazor Static SSR with no SignalR circuit and no WebAssembly.
+        </p>
+    </header>
+
+    @* ---- Feature cards ---- *@
+    <section class="mt-10">
+        <h2 class="text-2xl font-bold">What you can do</h2>
+        <div class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            @foreach (var f in Features)
+            {
+                <div class="card p-5">
+                    <div class="text-2xl">@f.Icon</div>
+                    <h3 class="mt-3 font-semibold">@f.Title</h3>
+                    <p class="mt-1 text-sm text-on-surface-variant">@f.Body</p>
+                </div>
+            }
         </div>
-    </div>
-</div>
+    </section>
+
+    @* ---- How it works ---- *@
+    <section class="mt-12">
+        <h2 class="text-2xl font-bold">How it works</h2>
+        <div class="mt-5 grid gap-4 md:grid-cols-3">
+            @foreach (var (n, step) in Steps.Select((s, i) => (i + 1, s)))
+            {
+                <div class="card p-5">
+                    <div class="flex h-9 w-9 items-center justify-center rounded-full bg-brand/15 font-bold text-brand">@n</div>
+                    <h3 class="mt-3 font-semibold">@step.Title</h3>
+                    <p class="mt-1 text-sm text-on-surface-variant">@step.Body</p>
+                </div>
+            }
+        </div>
+    </section>
+
+    @* ---- Collections callout (mirrors the Discover pills) ---- *@
+    <section class="mt-12">
+        <h2 class="text-2xl font-bold">Explore by collection</h2>
+        <p class="mt-3 max-w-3xl text-sm leading-relaxed text-on-surface-variant">
+            The <a href="/search" class="font-medium text-primary hover:text-primary-strong">Discover</a> page lets you
+            filter the entire catalog by industry, studio or category — so you can jump straight to what you're in the mood for.
+        </p>
+        <div class="mt-4 flex flex-wrap gap-2">
+            @foreach (var c in MoviesMafia.Services.Tmdb.MediaCollections.All)
+            {
+                <a href="/search" class="chip hover:border-brand/60 hover:text-content">
+                    <span aria-hidden="true">@c.Emoji</span>
+                    <span>@c.Label</span>
+                </a>
+            }
+        </div>
+    </section>
+
+    @* ---- FAQ (SEO-friendly: real questions people search) ---- *@
+    <section class="mt-12">
+        <h2 class="text-2xl font-bold">Frequently asked questions</h2>
+        <div class="mt-5 max-w-3xl space-y-3">
+            @foreach (var qa in Faqs)
+            {
+                <details class="card group p-5">
+                    <summary class="flex cursor-pointer items-center justify-between font-medium marker:content-none">
+                        <span>@qa.Question</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0 text-muted transition-transform group-open:rotate-180" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.06l3.71-3.83a.75.75 0 111.08 1.04l-4.25 4.39a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                        </svg>
+                    </summary>
+                    <p class="mt-3 text-sm leading-relaxed text-on-surface-variant">@qa.Answer</p>
+                </details>
+            }
+        </div>
+    </section>
+
+    @* ---- Built with ---- *@
+    <section class="mt-12">
+        <div class="card p-6">
+            <h2 class="font-semibold">Built with</h2>
+            <div class="mt-3 flex flex-wrap gap-2">
+                <span class="chip">Blazor Static SSR · .NET 10</span>
+                <span class="chip">ReactiveBlazor</span>
+                <span class="chip">Tailwind CSS v4</span>
+                <span class="chip">Alpine.js</span>
+                <span class="chip">PostgreSQL · EF Core</span>
+                <span class="chip">TMDB API</span>
+            </div>
+        </div>
+    </section>
+
+    @* ---- Attribution / disclaimer ---- *@
+    <section class="mt-8 max-w-3xl">
+        <p class="text-xs leading-relaxed text-muted">
+            This product uses the TMDB API but is not endorsed or certified by TMDB. All movie and series
+            metadata, images and ratings are provided by The Movie Database. MoviesMafia does not host any
+            video content; playback is provided by third-party sources.
+        </p>
+    </section>
+
 </div>
 
 @code {
     private record Feature(string Icon, string Title, string Body);
+    private record Step(string Title, string Body);
+    private record Faq(string Question, string Answer);
 
     private static readonly Feature[] Features =
     [
-        new("🎬", "Discover", "Browse popular movies and series, refreshed from TMDB."),
-        new("⚡", "Reactive", "Search, trailers and more update in place — no full page reloads."),
-        new("🍿", "Watch", "Stream trailers and full titles right in the browser."),
+        new("🎬", "Discover", "Browse trending, popular, top-rated and upcoming movies and series, refreshed from TMDB."),
+        new("🔎", "Search & filter", "Find any title, then filter by year, rating, industry or studio."),
+        new("⚡", "Reactive", "Search, source switching and forms update in place — no full page reloads."),
+        new("🍿", "Watch", "Play trailers and full titles right in the browser, with multiple sources."),
+    ];
+
+    private static readonly Step[] Steps =
+    [
+        new("Find something", "Search by name from the top bar, or browse the Discover page by collection, genre, year and rating."),
+        new("Check the details", "Open a title for its overview, rating, cast, seasons and recommendations, or watch the trailer first."),
+        new("Press play", "Sign in and stream the movie or episode. Switch between sources if one doesn't load."),
+    ];
+
+    private static readonly Faq[] Faqs =
+    [
+        new("Is MoviesMafia free to use?",
+            "Yes. Browsing, searching and watching trailers are completely free, and you can explore the catalog without an account. A free account is only needed to stream full titles."),
+        new("Where does the movie and series data come from?",
+            "All metadata, posters, ratings and cast information come from The Movie Database (TMDB), a community-maintained movie and TV database."),
+        new("Do I need to install anything?",
+            "No. MoviesMafia runs entirely in your web browser on desktop and mobile — there's nothing to download or install."),
+        new("What kinds of collections can I browse?",
+            "You can filter by industry (Hollywood, Bollywood, Korean), by studio (Marvel, DC, Pixar, Studio Ghibli, Disney, DreamWorks) and by category such as anime, plus standard genre, year and rating filters."),
+        new("Does MoviesMafia host the videos?",
+            "No. MoviesMafia is a discovery and playback interface; the video streams are served by third-party providers. If one source doesn't work, you can switch to another from the player."),
     ];
 }
