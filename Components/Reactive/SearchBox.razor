@@ -27,13 +27,22 @@
                 <svg xmlns="http://www.w3.org/2000/svg" class="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
                 </svg>
-                <input class="input pl-10"
+                <input class="input pl-10 pr-10"
                        placeholder="Search movies and series…"
                        autocomplete="off"
                        data-bind="Query"
                        data-on-input="Search"
                        data-debounce="350"
                        value="@Query" />
+                @* Spinner shown only while a reactive dispatch is in flight. The library
+                   toggles `.reactive-loading` on the root, so this is pure CSS — see app.tailwind.css. *@
+                <span class="search-spinner pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2"
+                      role="status" aria-label="Searching">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 animate-spin text-brand" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                    </svg>
+                </span>
             </div>
             <div class="flex gap-2">
                 <button type="button" class="@ScopeClass(SearchScope.All)" data-on-click="SetAll">All</button>
@@ -80,6 +89,20 @@
             }
         </div>
 
+        @* ---- Collections: industries, studios & categories ---- *@
+        <div class="mt-4 flex flex-wrap gap-2">
+            @foreach (var c in MediaCollections.All)
+            {
+                var active = Collection == c.Id;
+                <button type="button" data-on-click="ToggleCollection" data-args="@($"[\"{c.Id}\"]")"
+                        aria-pressed="@(active ? "true" : "false")"
+                        class="@($"chip transition {(active ? "border-brand bg-brand/15 text-content" : "hover:border-brand/60 hover:text-content")}")">
+                    <span aria-hidden="true">@c.Emoji</span>
+                    <span>@c.Label</span>
+                </button>
+            }
+        </div>
+
         @* ---- Results / discovery ---- *@
         <div class="mt-8">
             @if (_loadError is not null)
@@ -88,9 +111,20 @@
             }
             else if (IsBrowsing)
             {
-                @* No query: browse/discover mode. *@
+                @* No query (or a collection is selected): browse/discover mode. *@
                 <p class="mb-4 text-sm text-muted">
-                    @(HasActiveFilters ? "Browsing the catalog with your filters." : "Popular right now — start typing to search, or refine with the filters above.")
+                    @if (MediaCollections.Find(Collection) is { } col)
+                    {
+                        @($"Browsing {col.Label}") <text>— </text>@($"{_totalResults:N0} titles.")
+                    }
+                    else if (HasActiveFilters)
+                    {
+                        <text>Browsing the catalog with your filters.</text>
+                    }
+                    else
+                    {
+                        <text>Popular right now — start typing to search, or refine with the filters above.</text>
+                    }
                 </p>
                 @ResultsGrid()
             }
@@ -122,12 +156,18 @@
 </ReactiveRoot>
 
 @code {
+    // Seed query from the navbar quick-search (?q=...). Parameters are NOT serialized
+    // into the reactive token and the parent isn't re-rendered on a dispatch, so this
+    // arrives only on the initial SSR render — exactly when we want to prime the box.
+    [Parameter] public string? InitialQuery { get; set; }
+
     // ---- Persisted state (serialized into the token) ----
     public string Query { get; set; } = string.Empty;
     public SearchScope Scope { get; set; } = SearchScope.All;
     public string Sort { get; set; } = "relevance";
     public int? Year { get; set; }
     public double MinRating { get; set; }
+    public string? Collection { get; set; }   // MediaCollection id (bollywood, marvel, …)
     public int Page { get; set; } = 1;
 
     // ---- Transient per-dispatch data (private fields are never serialized) ----
@@ -138,8 +178,11 @@
 
     private const int PageSize = 20;
 
-    private bool IsBrowsing => string.IsNullOrWhiteSpace(Query);
-    private bool HasActiveFilters => Year is not null || MinRating > 0 || Sort != "relevance";
+    // A selected collection forces browse mode: TMDB's search endpoints ignore discover
+    // params (genre/company/language), and the search list DTOs don't carry those fields,
+    // so client-side filtering isn't possible. Collections are a server-side discover feature.
+    private bool IsBrowsing => string.IsNullOrWhiteSpace(Query) || Collection is not null;
+    private bool HasActiveFilters => Year is not null || MinRating > 0 || Sort != "relevance" || Collection is not null;
     private bool CanLoadMore => _loadError is null && _results.Count > 0 && Page < _totalPages;
 
     private static IEnumerable<int> YearOptions => Enumerable.Range(1950, DateTime.UtcNow.Year - 1950 + 1).Reverse();
@@ -147,7 +190,17 @@
     // Every dispatch reconstructs the component from its token, so we always
     // (re)load before rendering. OnParametersSetAsync runs after the action has
     // mutated state and after the initial SSR — the single place to fetch.
-    protected override async Task OnParametersSetAsync() => await LoadAsync();
+    protected override async Task OnParametersSetAsync()
+    {
+        // Initial render only: prime the box from the navbar quick-search query.
+        // InitialQuery is null on every subsequent dispatch (params aren't serialized).
+        if (!string.IsNullOrWhiteSpace(InitialQuery))
+        {
+            Query = InitialQuery.Trim();
+        }
+
+        await LoadAsync();
+    }
 
     [ReactiveAction]
     public void Search() => Page = 1;          // query bound via data-bind; just reset paging
@@ -165,11 +218,20 @@
     public void ApplyFilters() => Page = 1;    // sort/year/min-rating bound via data-bind
 
     [ReactiveAction]
+    public void ToggleCollection(string id)
+    {
+        // Tapping the active collection clears it; tapping another switches to it.
+        Collection = Collection == id ? null : id;
+        Page = 1;
+    }
+
+    [ReactiveAction]
     public void ResetFilters()
     {
         Sort = "relevance";
         Year = null;
         MinRating = 0;
+        Collection = null;
         Page = 1;
     }
 
@@ -209,6 +271,12 @@
             Year = Year,
             MinRating = MinRating > 0 ? MinRating : null,
         };
+
+        // Layer the selected collection's axes (genre/company/language/…) on top.
+        if (MediaCollections.Find(Collection) is { } collection)
+        {
+            filter = collection.Apply(filter);
+        }
 
         var hits = new List<SearchHit>();
         var totalResults = 0;

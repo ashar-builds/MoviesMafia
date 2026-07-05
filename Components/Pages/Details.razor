@@ -1,4 +1,5 @@
 @page "/details/{Type}/{TmdbId:int}"
+@attribute [StreamRendering]
 @using MoviesMafia.Services.Tmdb
 @using MoviesMafia.Services.Tmdb.Dtos
 @inject ITmdbClient Tmdb
@@ -17,7 +18,35 @@
 }
 else if (_displayTitle is null)
 {
-    <div class="w-full px-4 py-16 text-center text-muted sm:px-6 lg:px-10">Loading…</div>
+    @* Detail-shaped skeleton streamed immediately while TMDB data loads. *@
+    <section class="relative w-full overflow-hidden bg-ink" aria-hidden="true">
+        <div class="skeleton absolute inset-0 rounded-none opacity-40"></div>
+        <div class="relative z-10 w-full px-4 py-10 sm:px-6 sm:py-14 lg:px-10 lg:py-20">
+            <div class="grid gap-8 sm:gap-10 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]">
+                <div class="mx-auto w-44 sm:w-56 lg:mx-0 lg:w-full">
+                    <div class="skeleton aspect-[2/3] w-full"></div>
+                </div>
+                <div class="space-y-4">
+                    <div class="skeleton h-10 w-3/4"></div>
+                    <div class="skeleton h-5 w-1/2"></div>
+                    <div class="flex gap-3 pt-2">
+                        <div class="skeleton h-8 w-24 rounded-full"></div>
+                        <div class="skeleton h-8 w-24 rounded-full"></div>
+                        <div class="skeleton h-8 w-24 rounded-full"></div>
+                    </div>
+                    <div class="flex gap-3 pt-2">
+                        <div class="skeleton h-11 w-36"></div>
+                        <div class="skeleton h-11 w-36"></div>
+                    </div>
+                    <div class="space-y-2 pt-4">
+                        <div class="skeleton h-4 w-full"></div>
+                        <div class="skeleton h-4 w-full"></div>
+                        <div class="skeleton h-4 w-2/3"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
 }
 else
 {
@@ -110,12 +139,26 @@ else
 
                     @* ---- Action buttons (mirrors the card overlay) ---- *@
                     <div class="mt-6 flex flex-wrap gap-3">
-                        <a href="@WatchUrl" class="btn-primary">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                <path d="M6 4.5v11a.5.5 0 0 0 .77.42l9-5.5a.5.5 0 0 0 0-.84l-9-5.5A.5.5 0 0 0 6 4.5z" />
-                            </svg>
-                            <span>Watch now</span>
-                        </a>
+                        <AuthorizeView>
+                            <Authorized>
+                                <a href="@WatchUrl" class="btn-primary">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                        <path d="M6 4.5v11a.5.5 0 0 0 .77.42l9-5.5a.5.5 0 0 0 0-.84l-9-5.5A.5.5 0 0 0 6 4.5z" />
+                                    </svg>
+                                    <span>Watch now</span>
+                                </a>
+                            </Authorized>
+                            <NotAuthorized>
+                                @* /watch is gated — send anonymous users to sign in, returning
+                                   straight to playback afterwards, so the redirect isn't a surprise. *@
+                                <a href="@($"/account/login?returnUrl={Uri.EscapeDataString(WatchUrl)}")" class="btn-primary">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                        <path fill-rule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clip-rule="evenodd" />
+                                    </svg>
+                                    <span>Sign in to watch</span>
+                                </a>
+                            </NotAuthorized>
+                        </AuthorizeView>
                         <a href="@TrailerUrl" class="btn-ghost">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                 <path fill-rule="evenodd" d="M2 6a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zm14.553.106A1 1 0 0016 7v6a1 1 0 001.447.894l2-1A1 1 0 0020 12V8a1 1 0 00-.553-.894l-2-1z" clip-rule="evenodd" />

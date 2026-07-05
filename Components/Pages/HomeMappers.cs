@@ -13,6 +13,23 @@ internal static class HomeMappers
     internal static string? Year(string? date) =>
         !string.IsNullOrEmpty(date) && date.Length >= 4 ? date[..4] : null;
 
+    /// <summary>
+    /// Loads a single discovery row, assigning the result via <paramref name="assign"/>.
+    /// On failure the row is assigned an empty list so its skeleton resolves to an
+    /// empty state instead of leaving the whole page stuck loading.
+    /// </summary>
+    internal static async Task LoadRow<T>(Func<Task<List<T>>> load, Action<List<T>> assign)
+    {
+        try
+        {
+            assign(await load());
+        }
+        catch
+        {
+            assign([]);
+        }
+    }
+
     internal static List<HeroSlide> ToHeroSlides(
         IEnumerable<MovieResult> movies, ITmdbClient tmdb, string kind = "Trending movie") =>
         movies.Where(m => !string.IsNullOrWhiteSpace(m.BackdropPath))

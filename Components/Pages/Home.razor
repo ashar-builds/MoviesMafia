@@ -1,4 +1,5 @@
 @page "/"
+@attribute [StreamRendering]
 @using MoviesMafia.Services.Tmdb
 @using MoviesMafia.Services.Tmdb.Dtos
 @inject ITmdbClient Tmdb
@@ -6,50 +7,45 @@
 <PageTitle>MoviesMafia — Stream the classics</PageTitle>
 
 @* Hero is full-bleed (no padding around it). *@
-<HeroCarousel Slides="_hero" />
+<HeroCarousel Slides="_hero" Loading="_heroLoading" />
 
 @* Everything else uses the immersive full-width canvas with breathing room. *@
 <div class="w-full px-4 pb-16 sm:px-6 lg:px-10">
-
-    @if (_loadError is not null)
-    {
-        <StatusMessage IsError="true" Message="@_loadError" />
-    }
 
     @* Server-driven filters via ReactiveBlazor. *@
     <TrendingSection />
     <PopularSection />
 
-    <MediaRow Title="Now playing in theaters" Subtitle="Catch the latest releases" MoreUrl="/movies">
-        @foreach (var m in _nowPlaying)
+    <MediaRow Title="Now playing in theaters" Subtitle="Catch the latest releases" MoreUrl="/movies" Loading="_nowPlaying is null">
+        @foreach (var m in _nowPlaying ?? Empty<MovieResult>())
         {
             @MovieCard(m)
         }
     </MediaRow>
 
-    <MediaRow Title="Top rated movies" Subtitle="The all-time greats according to TMDB" MoreUrl="/movies">
-        @foreach (var m in _topRatedMovies)
+    <MediaRow Title="Top rated movies" Subtitle="The all-time greats according to TMDB" MoreUrl="/movies" Loading="_topRatedMovies is null">
+        @foreach (var m in _topRatedMovies ?? Empty<MovieResult>())
         {
             @MovieCard(m)
         }
     </MediaRow>
 
-    <MediaRow Title="Upcoming movies" Subtitle="Mark your calendar">
-        @foreach (var m in _upcoming)
+    <MediaRow Title="Upcoming movies" Subtitle="Mark your calendar" Loading="_upcoming is null">
+        @foreach (var m in _upcoming ?? Empty<MovieResult>())
         {
             @MovieCard(m)
         }
     </MediaRow>
 
-    <MediaRow Title="On the air" Subtitle="Series with new episodes airing now" MoreUrl="/series">
-        @foreach (var s in _onTheAir)
+    <MediaRow Title="On the air" Subtitle="Series with new episodes airing now" MoreUrl="/series" Loading="_onTheAir is null">
+        @foreach (var s in _onTheAir ?? Empty<SeriesResult>())
         {
             @SeriesCard(s)
         }
     </MediaRow>
 
-    <MediaRow Title="Top rated series" Subtitle="Binge-worthy classics">
-        @foreach (var s in _topRatedSeries)
+    <MediaRow Title="Top rated series" Subtitle="Binge-worthy classics" Loading="_topRatedSeries is null">
+        @foreach (var s in _topRatedSeries ?? Empty<SeriesResult>())
         {
             @SeriesCard(s)
         }
@@ -60,39 +56,39 @@
 @code {
     private const int RowSize = HomeMappers.RowSize;
 
+    // null = still loading (row shows skeletons); non-null = loaded (possibly empty on failure).
     private List<HeroSlide> _hero = new();
-    private List<MovieResult> _nowPlaying = new();
-    private List<MovieResult> _topRatedMovies = new();
-    private List<MovieResult> _upcoming = new();
-    private List<SeriesResult> _onTheAir = new();
-    private List<SeriesResult> _topRatedSeries = new();
-    private string? _loadError;
+    private bool _heroLoading = true;
+    private List<MovieResult>? _nowPlaying;
+    private List<MovieResult>? _topRatedMovies;
+    private List<MovieResult>? _upcoming;
+    private List<SeriesResult>? _onTheAir;
+    private List<SeriesResult>? _topRatedSeries;
 
     protected override async Task OnInitializedAsync()
     {
+        // Each row streams in independently: one slow or failing TMDB endpoint
+        // no longer blanks the whole page (StreamRendering flushes as each completes).
+        await Task.WhenAll(
+            LoadHeroAsync(),
+            HomeMappers.LoadRow(async () => (await Tmdb.GetNowPlayingMoviesAsync()).Results.Take(RowSize).ToList(), r => _nowPlaying = r),
+            HomeMappers.LoadRow(async () => (await Tmdb.GetTopRatedMoviesAsync()).Results.Take(RowSize).ToList(), r => _topRatedMovies = r),
+            HomeMappers.LoadRow(async () => (await Tmdb.GetUpcomingMoviesAsync()).Results.Take(RowSize).ToList(), r => _upcoming = r),
+            HomeMappers.LoadRow(async () => (await Tmdb.GetOnTheAirSeriesAsync()).Results.Take(RowSize).ToList(), r => _onTheAir = r),
+            HomeMappers.LoadRow(async () => (await Tmdb.GetTopRatedSeriesAsync()).Results.Take(RowSize).ToList(), r => _topRatedSeries = r));
+    }
+
+    private async Task LoadHeroAsync()
+    {
         try
         {
-            var heroTask = Tmdb.GetTrendingMoviesAsync("day");
-            var nowPlayingTask = Tmdb.GetNowPlayingMoviesAsync();
-            var topRatedMoviesTask = Tmdb.GetTopRatedMoviesAsync();
-            var upcomingTask = Tmdb.GetUpcomingMoviesAsync();
-            var onTheAirTask = Tmdb.GetOnTheAirSeriesAsync();
-            var topRatedSeriesTask = Tmdb.GetTopRatedSeriesAsync();
-
-            await Task.WhenAll(heroTask, nowPlayingTask, topRatedMoviesTask, upcomingTask, onTheAirTask, topRatedSeriesTask);
-
-            _hero = HomeMappers.ToHeroSlides((await heroTask).Results, Tmdb);
-            _nowPlaying = (await nowPlayingTask).Results.Take(RowSize).ToList();
-            _topRatedMovies = (await topRatedMoviesTask).Results.Take(RowSize).ToList();
-            _upcoming = (await upcomingTask).Results.Take(RowSize).ToList();
-            _onTheAir = (await onTheAirTask).Results.Take(RowSize).ToList();
-            _topRatedSeries = (await topRatedSeriesTask).Results.Take(RowSize).ToList();
+            _hero = HomeMappers.ToHeroSlides((await Tmdb.GetTrendingMoviesAsync("day")).Results, Tmdb);
         }
-        catch
-        {
-            _loadError = "We couldn't load the homepage right now. Please try again shortly.";
-        }
+        catch { /* hero carousel renders its own empty state */ }
+        finally { _heroLoading = false; }
     }
+
+    private static IEnumerable<T> Empty<T>() => [];
 
     private static string? Year(string? date) => HomeMappers.Year(date);
 

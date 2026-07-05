@@ -21,4 +21,26 @@ public sealed record DiscoverFilter
     /// rating-sorted results — TMDB's own "top rated" lists apply a similar guard.
     /// </summary>
     public int MinVotes { get; init; } = 50;
+
+    // ---- Collection axes (Bollywood / Hollywood / Marvel / DC / Anime …) ----
+    // Each is a raw TMDB query value. TMDB treats comma as OR and pipe (|) as AND
+    // within a single param; callers build those strings. Null = don't constrain.
+
+    /// <summary>TMDB genre id(s), e.g. "16" (Animation) or "28,12" (Action OR Adventure).</summary>
+    public string? WithGenres { get; init; }
+
+    /// <summary>TMDB production-company id(s), e.g. "420" (Marvel Studios).</summary>
+    public string? WithCompanies { get; init; }
+
+    /// <summary>TMDB keyword id(s), e.g. "9715" (superhero).</summary>
+    public string? WithKeywords { get; init; }
+
+    /// <summary>ISO 639-1 original language, e.g. "hi" (Hindi), "en", "ja", "ko".</summary>
+    public string? WithOriginalLanguage { get; init; }
+
+    /// <summary>ISO 3166-1 origin country, e.g. "JP", "KR", "IN" (TV discover).</summary>
+    public string? WithOriginCountry { get; init; }
+
+    /// <summary>ISO 3166-1 region for release filtering, e.g. "IN", "US" (movie discover).</summary>
+    public string? Region { get; init; }
 }

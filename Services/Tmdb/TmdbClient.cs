@@ -181,7 +181,25 @@ public sealed class TmdbClient : ITmdbClient
             query["vote_average.gte"] = minRating.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
 
+        // Collection axes. Each is optional; only emit when the caller set it. TMDB ignores
+        // params that don't apply to the endpoint (e.g. with_origin_country on movies), so we
+        // can pass them uniformly and let the preset decide which are meaningful.
+        AddIfSet(query, "with_genres", filter.WithGenres);
+        AddIfSet(query, "with_companies", filter.WithCompanies);
+        AddIfSet(query, "with_keywords", filter.WithKeywords);
+        AddIfSet(query, "with_original_language", filter.WithOriginalLanguage);
+        AddIfSet(query, "with_origin_country", filter.WithOriginCountry);
+        AddIfSet(query, "region", filter.Region);
+
         return query;
+    }
+
+    private static void AddIfSet(Dictionary<string, string?> query, string key, string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            query[key] = value;
+        }
     }
 
     private async Task<T> GetAsync<T>(string path, Dictionary<string, string?> query, CancellationToken ct)

@@ -106,6 +106,20 @@
                 <iframe src="@CurrentUrl" class="h-full w-full" allowfullscreen
                         referrerpolicy="origin" ></iframe>
             </div>
+
+            @* Cross-origin embeds can silently fail to load (provider down, region-blocked,
+               or blocked by an extension). We can't detect that from here, so we always offer
+               the recovery path: switch sources. *@
+            <p class="mt-3 text-center text-xs text-on-surface-variant">
+                @if (_sources.Count > 1)
+                {
+                    <span>Video not playing? Pick a different source from the menu above.</span>
+                }
+                else
+                {
+                    <span>If the video doesn't load, the provider may be temporarily unavailable — try again shortly.</span>
+                }
+            </p>
         }
     </div>
 </ReactiveRoot>

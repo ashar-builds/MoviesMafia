@@ -2,7 +2,7 @@
 
 <header data-nav-header
         class="sticky top-0 z-40 border-b border-line/80 bg-ink/80 backdrop-blur-xl relative"
-        x-data="{ open: false }">
+        x-data="{ open: false, search: false }">
     @* Top-loading progress bar. Driven by app.js on Blazor navigation. *@
     <div id="nav-progress"
          class="pointer-events-none absolute inset-x-0 bottom-0 z-50 h-0.5 origin-left bg-brand"
@@ -16,14 +16,34 @@
         <div class="hidden items-center gap-1 md:flex">
             <NavItem Href="movies" Label="Movies" />
             <NavItem Href="series" Label="Series" />
-            <NavItem Href="search" Label="Search" />
+            @* Points at the search page in its browse/discover mode (empty query =
+               popular titles + filters). The navbar search bar covers quick lookups. *@
+            <NavItem Href="search" Label="Discover" />
             <NavItem Href="about" Label="About" />
             <AuthorizeView Roles="Admin">
                 <NavItem Href="admin/users" Label="Admin" />
             </AuthorizeView>
         </div>
 
-        <div class="ml-auto hidden items-center gap-2 md:flex">
+        @* Desktop quick-search. GET form → /search?q=... (no antiforgery needed for a safe
+           GET). data-enhance routes it through Blazor enhanced navigation, so submitting
+           morphs the page (progress bar, no full reload) like the rest of the app. The
+           Search page seeds the reactive SearchBox from ?q=. *@
+        <form method="get" action="/search" role="search" data-enhance
+              class="ml-auto hidden max-w-xs flex-1 items-center md:flex lg:max-w-sm">
+            <div class="relative w-full">
+                <svg xmlns="http://www.w3.org/2000/svg" class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+                </svg>
+                <input type="search" name="q" autocomplete="off"
+                       placeholder="Search movies & series…"
+                       aria-label="Search movies and series"
+                       class="input h-10 pl-9 pr-3 py-0" />
+            </div>
+            <button type="submit" class="btn-primary ml-2 h-10 shrink-0 px-4">Search</button>
+        </form>
+
+        <div class="ml-3 hidden items-center gap-2 md:flex">
             <AuthorizeView>
                 <Authorized>
                     <a href="account/profile" class="btn-ghost">@context.User.Identity?.Name</a>
@@ -39,15 +59,51 @@
             </AuthorizeView>
         </div>
 
-        <button type="button"
-                class="ml-auto grid h-11 w-11 place-items-center rounded-lg border border-line bg-surface-2/60 text-content transition hover:bg-surface-2 md:hidden"
-                aria-label="Toggle menu"
-                x-on:click="open = !open">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-        </button>
+        @* Mobile actions: search toggle + hamburger. The search bar (below) is hidden
+           until the icon is tapped, so it doesn't permanently eat vertical space. *@
+        <div class="ml-auto flex items-center gap-2 md:hidden">
+            <button type="button"
+                    class="grid h-11 w-11 place-items-center rounded-lg border border-line bg-surface-2/60 text-content transition hover:bg-surface-2"
+                    aria-label="Toggle search" x-bind:aria-expanded="search"
+                    x-on:click="search = !search; if (search) $nextTick(() => $refs.mobileSearchInput?.focus())">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+                </svg>
+            </button>
+            <button type="button"
+                    class="grid h-11 w-11 place-items-center rounded-lg border border-line bg-surface-2/60 text-content transition hover:bg-surface-2"
+                    aria-label="Toggle menu" x-bind:aria-expanded="open"
+                    x-on:click="open = !open">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+            </button>
+        </div>
     </nav>
+
+    @* Mobile quick-search. Hidden until the search icon in the nav is tapped, so it
+       doesn't permanently take vertical space. Separate from the hamburger dropdown.
+       Server-rendered display:none so an enhanced-nav morph keeps it collapsed. *@
+    <div class="border-t border-line/60 px-4 py-2.5 md:hidden"
+         x-show="search" x-cloak x-transition style="display:none">
+        <form method="get" action="/search" role="search" data-enhance class="flex items-center gap-2">
+            <div class="relative flex-1">
+                <svg xmlns="http://www.w3.org/2000/svg" class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+                </svg>
+                <input type="search" name="q" autocomplete="off"
+                       x-ref="mobileSearchInput"
+                       placeholder="Search movies & series…"
+                       aria-label="Search movies and series"
+                       class="input pl-9" />
+            </div>
+            <button type="submit" class="btn-primary shrink-0 px-4" aria-label="Search">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+                </svg>
+            </button>
+        </form>
+    </div>
 
     @* Absolute so the open menu overlays the hero instead of pushing it down.
        style="display:none" is server-rendered so an enhanced-navigation morph keeps
@@ -58,7 +114,7 @@
         <div class="space-y-1 px-4 py-3">
             <a href="movies" class="block rounded-lg px-3 py-2 text-sm text-content hover:bg-surface-2">Movies</a>
             <a href="series" class="block rounded-lg px-3 py-2 text-sm text-content hover:bg-surface-2">Series</a>
-            <a href="search" class="block rounded-lg px-3 py-2 text-sm text-content hover:bg-surface-2">Search</a>
+            <a href="search" class="block rounded-lg px-3 py-2 text-sm text-content hover:bg-surface-2">Discover</a>
             <a href="about" class="block rounded-lg px-3 py-2 text-sm text-content hover:bg-surface-2">About</a>
             <AuthorizeView Roles="Admin">
                 <a href="admin/users" class="block rounded-lg px-3 py-2 text-sm text-content hover:bg-surface-2">Admin</a>

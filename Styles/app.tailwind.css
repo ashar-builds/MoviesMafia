@@ -34,6 +34,15 @@
     --color-content: #e7e9f0;      /* primary text */
     --color-muted: #9aa0b4;        /* secondary text */
 
+    /* Aliases — Material-style names used across account/admin/detail views
+       map onto the cinematic tokens above so those utilities emit real CSS. */
+    --color-primary: var(--color-brand);
+    --color-primary-strong: var(--color-brand-strong);
+    --color-primary-container: var(--color-surface-2);
+    --color-on-surface: var(--color-content);
+    --color-on-surface-variant: var(--color-muted);
+    --color-surface-container-high: var(--color-surface-2);
+
     --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 
     --radius-card: 0.9rem;
@@ -125,5 +134,40 @@
 
     .chip {
         @apply inline-flex items-center gap-1.5 rounded-full border border-line bg-surface-2/60 px-3 py-1 text-xs text-muted;
+    }
+
+    /* Search spinner: hidden by default, revealed only while ReactiveBlazor is
+       mid-dispatch (the library toggles .reactive-loading on the ReactiveRoot). */
+    .search-spinner {
+        @apply hidden;
+    }
+
+    .reactive-loading .search-spinner {
+        @apply block;
+    }
+
+    /* Loading placeholder — a soft shimmering block used while data streams in. */
+    .skeleton {
+        @apply relative overflow-hidden rounded-md bg-surface-2;
+    }
+
+    .skeleton::after {
+        content: "";
+        @apply absolute inset-0;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
+        transform: translateX(-100%);
+        animation: skeleton-shimmer 1.4s ease-in-out infinite;
+    }
+}
+
+@keyframes skeleton-shimmer {
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .skeleton::after {
+        animation: none;
     }
 }

@@ -25,7 +25,17 @@
         </button>
 
         <div x-ref="row" class="scrollbar-hide -mx-2 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-2 pb-2">
-            @ChildContent
+            @if (Loading)
+            {
+                @for (var i = 0; i < SkeletonCount; i++)
+                {
+                    <SkeletonCard />
+                }
+            }
+            else
+            {
+                @ChildContent
+            }
         </div>
 
         <button type="button" x-on:click="scroll(1)"
@@ -43,4 +53,10 @@
     [Parameter] public string? Subtitle { get; set; }
     [Parameter] public string? MoreUrl { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>When true, the row renders shimmer placeholders instead of its content.</summary>
+    [Parameter] public bool Loading { get; set; }
+
+    /// <summary>How many placeholder cards to show while loading.</summary>
+    [Parameter] public int SkeletonCount { get; set; } = 8;
 }
