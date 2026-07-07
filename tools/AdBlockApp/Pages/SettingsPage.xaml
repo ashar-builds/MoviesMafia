@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="AdBlockApp.Pages.SettingsPage"
+             Title="Settings"
+             Shell.NavBarIsVisible="True">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="24">
+
+            <VerticalStackLayout Spacing="4">
+                <Label Text="Ad-blocking" FontAttributes="Bold" FontSize="18" />
+                <HorizontalStackLayout Spacing="12">
+                    <Switch x:Name="AdBlockSwitch" Toggled="OnAdBlockToggled" />
+                    <Label Text="Block ads and trackers" VerticalOptions="Center" />
+                </HorizontalStackLayout>
+            </VerticalStackLayout>
+
+            <VerticalStackLayout Spacing="4">
+                <Label Text="Filter lists" FontAttributes="Bold" FontSize="18" />
+                <Label x:Name="FilterStatusLabel" Text="Loading…" />
+                <Button x:Name="CheckFiltersButton" Text="Check for filter updates now" Clicked="OnCheckFiltersClicked" HorizontalOptions="Start" />
+            </VerticalStackLayout>
+
+            <VerticalStackLayout Spacing="4">
+                <Label Text="Allowlisted sites" FontAttributes="Bold" FontSize="18" />
+                <Label Text="Sites exempted from both network and cosmetic ad-blocking." FontSize="12" TextColor="Gray" />
+                <CollectionView x:Name="AllowlistView" HeightRequest="150">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate>
+                            <Grid ColumnDefinitions="*,Auto" Padding="0,4">
+                                <Label Text="{Binding .}" VerticalOptions="Center" />
+                                <Button Grid.Column="1" Text="Remove" Clicked="OnRemoveAllowlistEntryClicked" CommandParameter="{Binding .}" />
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+                <HorizontalStackLayout Spacing="8">
+                    <Entry x:Name="NewAllowlistEntry" Placeholder="example.com" WidthRequest="220" />
+                    <Button Text="Add" Clicked="OnAddAllowlistEntryClicked" />
+                </HorizontalStackLayout>
+            </VerticalStackLayout>
+
+            <VerticalStackLayout Spacing="4">
+                <Label Text="Updates" FontAttributes="Bold" FontSize="18" />
+                <HorizontalStackLayout Spacing="12">
+                    <Switch x:Name="AutoUpdateSwitch" Toggled="OnAutoUpdateToggled" />
+                    <Label Text="Check GitHub for new versions" VerticalOptions="Center" />
+                </HorizontalStackLayout>
+                <Label x:Name="UpdateStatusLabel" Text="Not checked yet" />
+                <Button x:Name="CheckUpdateButton" Text="Check for app update now" Clicked="OnCheckUpdateClicked" HorizontalOptions="Start" />
+            </VerticalStackLayout>
+
+            <VerticalStackLayout Spacing="4">
+                <Label Text="About" FontAttributes="Bold" FontSize="18" />
+                <Label x:Name="VersionLabel" Text="Version" />
+            </VerticalStackLayout>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>
