@@ -1,0 +1,151 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!--
+		Windows + Android only (see HANDOFF.md: "Architecture: .NET MAUI" — iOS/MacCatalyst were
+		never in scope for this ad-blocking shell). net10.0-windows10.0.19041.0 is the current
+		MAUI Windows TFM per the stock `dotnet new maui` template (confirmed against the
+		installed 10.0.301 SDK, not guessed).
+	-->
+	<PropertyGroup>
+		<TargetFrameworks>net10.0-android</TargetFrameworks>
+		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
+
+		<OutputType>Exe</OutputType>
+		<RootNamespace>AdBlockApp</RootNamespace>
+		<UseMaui>true</UseMaui>
+		<SingleProject>true</SingleProject>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+
+		<!-- Enable XAML source generation for faster build times and improved performance.
+		     This generates C# code from XAML at compile time instead of runtime inflation.
+		     To disable, remove this line.
+		     For individual files, you can override by setting Inflator metadata:
+		       <MauiXaml Update="MyPage.xaml" Inflator="Default" /> (reverts to defaults: Runtime for Debug, XamlC for Release)
+		       <MauiXaml Update="MyPage.xaml" Inflator="Runtime" /> (force runtime inflation) -->
+		<MauiXamlInflator>SourceGen</MauiXamlInflator>
+
+		<!-- Display name — the user-visible app name (window title, launcher/taskbar label).
+		     Intentionally "MoviesMafia": to the user this IS the MoviesMafia app, not a separate
+		     ad-blocker. (RootNamespace/AssemblyName stay AdBlockApp — internal only.) -->
+		<ApplicationTitle>MoviesMafia</ApplicationTitle>
+
+		<!-- App Identifier. Stable package id: Android refuses to update-install over a package
+		     whose id changed, so this must not drift once a build has shipped. -->
+		<ApplicationId>com.moviesmafia.adblockapp</ApplicationId>
+
+		<!-- Versions -->
+		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+		<ApplicationVersion>1</ApplicationVersion>
+
+		<!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
+		<WindowsPackageType>None</WindowsPackageType>
+
+		<!-- 26 (Android 8.0): minimum that supports androidx.webkit's DOCUMENT_START_SCRIPT
+		     feature check used for cross-frame cosmetic injection (see Platforms/Android
+		     WebViewClient) — devices below this floor still run, they just fall back to
+		     OnPageStarted injection (main-frame/no-earlier-guarantee); see README. -->
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">26.0</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
+		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+	</PropertyGroup>
+
+	<!--
+		Windows Release publish settings (HANDOFF.md Task 4) — self-contained, unpackaged
+		(WindowsPackageType=None above), single win-x64 folder so a downloaded release needs no
+		.NET or WindowsAppSDK preinstalled. See README's exact `dotnet publish` command.
+		WindowsAppSDKSelfContained is required for an unpackaged MAUI Windows app to run without
+		the WindowsAppRuntime installed on the target machine.
+	-->
+	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows' AND '$(Configuration)' == 'Release'">
+		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
+		<SelfContained>true</SelfContained>
+		<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<!-- App Icon -->
+		<MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#512BD4" />
+
+		<!-- Splash Screen -->
+		<MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
+
+		<!-- Images -->
+		<MauiImage Include="Resources\Images\*" />
+
+		<!-- Custom Fonts -->
+		<MauiFont Include="Resources\Fonts\*" />
+
+		<!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
+		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
+	</ItemGroup>
+
+	<!--
+		androidx.webkit's .NET binding — needed ONLY for WebViewCompat.AddDocumentStartJavaScript
+		and WebViewFeature.IsFeatureSupported (Platforms/Android/AdBlockWebViewClient.cs), the
+		Android equivalent of WebView2's AddScriptToExecuteOnDocumentCreatedAsync for cross-frame
+		cosmetic injection. See HANDOFF.md Task 1's Android cosmetic-injection note.
+	-->
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+		<PackageReference Include="Xamarin.AndroidX.Webkit" Version="1.16.0.1" />
+		<!--
+			Xamarin.AndroidX.Webkit 1.16.0.1 transitively pulls Xamarin.AndroidX.Core.Core.Ktx
+			1.16.0.3, which resolves against an older androidx.core:core-ktx than the
+			Xamarin.AndroidX.Core 1.19.0.1 MAUI itself brings in — two incompatible core-ktx.aar
+			copies land in the APK and R8/d8 fails with "Type ... is defined multiple times".
+			Pinning Core.Ktx to the same 1.19.0.1 line as Core resolves the duplicate.
+		-->
+		<PackageReference Include="Xamarin.AndroidX.Core.Core.Ktx" Version="1.19.0.1" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\AdBlockCore\AdBlockCore.csproj" />
+	</ItemGroup>
+
+	<!--
+		ANDROID SIGNING HOOK (HANDOFF.md Task 3's signature-consistency requirement + Task 4's
+		signing hook). Every build — CI or local — signs with the SAME key so a user can
+		update-over-install without Android rejecting it as a signature mismatch:
+
+		- Default (no env vars set): signing/adblockapp-debug.keystore, committed to this repo.
+		  This is a REUSED, checked-in debug keystore, not a fresh one generated per build/CI
+		  run — that reuse is the whole point (see HANDOFF's warning that a fresh key per build
+		  breaks updates silently, "discovered by a real user later"). It is NOT a security
+		  boundary; treat it as public.
+		- Real cert later: set ADBLOCKAPP_ANDROID_KEYSTORE_PATH (+ _STOREPASS/_KEYALIAS/
+		  _KEYPASS) as environment variables or MSBuild properties. No code/csproj changes
+		  needed — this Choose block is the one place that plugs in.
+	-->
+	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+		<AndroidKeyStore>true</AndroidKeyStore>
+		<AndroidSigningKeyStore Condition="'$(ADBLOCKAPP_ANDROID_KEYSTORE_PATH)' != ''">$(ADBLOCKAPP_ANDROID_KEYSTORE_PATH)</AndroidSigningKeyStore>
+		<AndroidSigningKeyStore Condition="'$(ADBLOCKAPP_ANDROID_KEYSTORE_PATH)' == ''">$(MSBuildThisFileDirectory)signing\adblockapp-debug.keystore</AndroidSigningKeyStore>
+		<AndroidSigningStorePass Condition="'$(ADBLOCKAPP_ANDROID_KEYSTORE_PATH)' != ''">$(ADBLOCKAPP_ANDROID_STOREPASS)</AndroidSigningStorePass>
+		<AndroidSigningStorePass Condition="'$(ADBLOCKAPP_ANDROID_KEYSTORE_PATH)' == ''">adblockapp</AndroidSigningStorePass>
+		<AndroidSigningKeyAlias Condition="'$(ADBLOCKAPP_ANDROID_KEYSTORE_PATH)' != ''">$(ADBLOCKAPP_ANDROID_KEYALIAS)</AndroidSigningKeyAlias>
+		<AndroidSigningKeyAlias Condition="'$(ADBLOCKAPP_ANDROID_KEYSTORE_PATH)' == ''">adblockapp</AndroidSigningKeyAlias>
+		<AndroidSigningKeyPass Condition="'$(ADBLOCKAPP_ANDROID_KEYSTORE_PATH)' != ''">$(ADBLOCKAPP_ANDROID_KEYPASS)</AndroidSigningKeyPass>
+		<AndroidSigningKeyPass Condition="'$(ADBLOCKAPP_ANDROID_KEYSTORE_PATH)' == ''">adblockapp</AndroidSigningKeyPass>
+	</PropertyGroup>
+
+	<!--
+		WINDOWS SIGNING HOOK (HANDOFF.md Task 4). We publish a plain self-contained exe, not
+		MSIX (WindowsPackageType=None — see README's "no store distribution" rationale), so
+		"signing" here means Authenticode-signing the published exe with signtool, not an MSIX
+		package certificate. Unsigned by default: no cert exists yet, and the exe runs fine
+		unsigned (Windows just shows an "unknown publisher" SmartScreen prompt on first run).
+		Real cert later: set ADBLOCKAPP_WIN_CERT_PATH (a .pfx path) and ADBLOCKAPP_WIN_CERT_PASSWORD
+		as environment variables before running `dotnet publish` (see README's release command) —
+		this target picks them up automatically post-publish, no csproj changes needed.
+	-->
+	<Target Name="SignWindowsPublishOutput" AfterTargets="Publish"
+	        Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows' AND '$(ADBLOCKAPP_WIN_CERT_PATH)' != ''">
+		<Exec Command="signtool sign /f &quot;$(ADBLOCKAPP_WIN_CERT_PATH)&quot; /p &quot;$(ADBLOCKAPP_WIN_CERT_PASSWORD)&quot; /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 &quot;$(PublishDir)AdBlockApp.exe&quot;" />
+	</Target>
+
+</Project>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="AdBlockApp.Pages.FirstRunPage"
+             Title="Welcome">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="30" Spacing="20" VerticalOptions="Center">
+
+            <Label Text="MoviesMafia"
+                   FontSize="28"
+                   FontAttributes="Bold"
+                   HorizontalOptions="Center" />
+
+            <Label Text="This app watches MoviesMafia through a browser that blocks ads at the network level — including ads inside the video provider's own embedded player, which a normal website can never reach or see into."
+                   FontSize="16" />
+
+            <Label Text="Ad-blocking is active by default. You can turn it off, manage per-site exceptions, and check filter-list status any time from Settings."
+                   FontSize="16" />
+
+            <Button x:Name="ContinueButton"
+                    Text="Continue"
+                    Clicked="OnContinueClicked"
+                    HorizontalOptions="Fill"
+                    Margin="0,20,0,0" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

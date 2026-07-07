@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell
+    x:Class="AdBlockApp.AppShell"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:pages="clr-namespace:AdBlockApp.Pages"
+    Title="MoviesMafia"
+    FlyoutBehavior="Disabled">
+
+    <!--
+        Only BrowserPage gets a permanent ShellContent (the flyout/tab UI MAUI would otherwise
+        generate) — FirstRunPage and SettingsPage are registered as routable-only via
+        Routing.RegisterRoute in AppShell.xaml.cs and reached with Shell.Current.GoToAsync, so
+        they don't show up as extra tabs. All three are DI-constructed (each takes an
+        AdBlockRuntime), which Shell/RegisterRoute resolves automatically through the app's
+        IServiceProvider — see AppShell.xaml.cs.
+    -->
+    <ShellContent
+        Title="Watch"
+        ContentTemplate="{DataTemplate pages:BrowserPage}"
+        Route="BrowserPage" />
+
+</Shell>

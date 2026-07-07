@@ -1,0 +1,32 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+	<application android:allowBackup="true" android:icon="@mipmap/appicon" android:roundIcon="@mipmap/appicon_round" android:supportsRtl="true">
+		<!--
+			FileProvider for the GitHub-Releases update flow (HANDOFF.md Task 3): hands the
+			system package installer a content:// URI for a downloaded update APK — installers
+			can't read our private app-data file:// paths directly. See
+			Platforms/Android/SettingsPage.Android.cs and Resources/xml/file_paths.xml.
+		-->
+		<provider
+			android:name="androidx.core.content.FileProvider"
+			android:authorities="${applicationId}.fileprovider"
+			android:exported="false"
+			android:grantUriPermissions="true">
+			<meta-data
+				android:name="android.support.FILE_PROVIDER_PATHS"
+				android:resource="@xml/file_paths" />
+		</provider>
+	</application>
+	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+	<uses-permission android:name="android.permission.INTERNET" />
+	<!--
+		"Special app access" permission (Android 8.0/API 26+, appop protection level — replaces
+		the old device-wide "Unknown sources" toggle with a per-app one) needed to prompt the
+		user through installing a side-loaded update APK. The user must still grant this
+		explicitly via Settings; SettingsPage.Android.cs checks
+		PackageManager.CanRequestPackageInstalls() and sends them to
+		Settings.ActionManageUnknownAppSources if it's not yet granted — see HANDOFF.md Task 3's
+		"document this requirement clearly" instruction.
+	-->
+	<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+</manifest>

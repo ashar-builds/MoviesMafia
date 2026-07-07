@@ -1,0 +1,197 @@
+name: Release Apps (Windows + Android)
+
+# Builds the MoviesMafia desktop/mobile ad-blocking shell (tools/AdBlockApp) and publishes the
+# artifacts to a GitHub Release. Runs ONLY on a version tag (v*) — NOT on every push to master.
+# The website has its own pipeline (deploy.yml, push-to-master); the apps ship on their own
+# cadence because the in-app updater keys off GitHub Releases (releases/latest), not site deploys.
+#
+# To cut a release:   git tag v1.2.0 && git push origin v1.2.0
+# The tag name drives the app version stamp AND the Release it attaches to.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build, e.g. v1.2.0 (manual runs only; tag runs derive it automatically)'
+        required: true
+
+permissions:
+  contents: write   # needed to create the GitHub Release and upload assets
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  # ---------------------------------------------------------------------------------------------
+  # Derive the version once, so both platform jobs stamp the SAME number. A tag push gives
+  # v1.2.0 via github.ref_name; a manual dispatch takes the typed input. We strip the leading
+  # 'v' for the numeric ApplicationDisplayVersion (must be dotted numbers) and keep the tag form
+  # for the Release name and the updater's tag comparison (UpdateChecker handles the 'v').
+  # ---------------------------------------------------------------------------------------------
+  version:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.v.outputs.tag }}
+      number: ${{ steps.v.outputs.number }}
+    steps:
+      - id: v
+        run: |
+          RAW="${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}"
+          TAG="$RAW"
+          NUMBER="${RAW#v}"
+          # Validate NUMBER is dotted numerics (1 / 1.2 / 1.2.3 / 1.2.3.4) — a bad tag would
+          # otherwise fail deep inside the MSBuild version stamp with a confusing error.
+          if ! echo "$NUMBER" | grep -Eq '^[0-9]+(\.[0-9]+){0,3}$'; then
+            echo "::error::Tag '$RAW' is not a valid version. Use vMAJOR.MINOR[.PATCH], e.g. v1.2.0."
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "number=$NUMBER" >> "$GITHUB_OUTPUT"
+          echo "Resolved tag=$TAG number=$NUMBER"
+
+  # ---------------------------------------------------------------------------------------------
+  # WINDOWS — publish the self-contained WindowsAppSDK folder, zip it. (MAUI Windows can't be a
+  # single self-updating exe; the app opens this zip's download page to update — see
+  # Platforms/Windows/SettingsPage.Windows.cs.)
+  # ---------------------------------------------------------------------------------------------
+  windows:
+    name: Build Windows
+    needs: version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install MAUI Windows workload
+        run: dotnet workload install maui-windows
+
+      - name: Publish (self-contained, win-x64)
+        shell: bash
+        run: |
+          dotnet publish tools/AdBlockApp/AdBlockApp.csproj \
+            -f net10.0-windows10.0.19041.0 -c Release \
+            -p:ApplicationDisplayVersion=${{ needs.version.outputs.number }} \
+            -p:ApplicationVersion=${{ github.run_number }}
+
+      - name: Zip publish output
+        shell: pwsh
+        run: |
+          $pub = "tools/AdBlockApp/bin/Release/net10.0-windows10.0.19041.0/win-x64/publish"
+          if (-not (Test-Path $pub)) { throw "Publish folder not found: $pub" }
+          $zip = "MoviesMafia-win-x64-${{ needs.version.outputs.tag }}.zip"
+          Compress-Archive -Path "$pub/*" -DestinationPath $zip -Force
+          echo "ASSET=$zip" >> $env:GITHUB_ENV
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-zip
+          path: ${{ env.ASSET }}
+          retention-days: 1
+
+  # ---------------------------------------------------------------------------------------------
+  # ANDROID — publish the signed release APK. Signing uses a CI-secret keystore (see the
+  # ADBLOCKAPP_ANDROID_* env below → the signing hook in AdBlockApp.csproj picks these up). The
+  # keystore MUST be the same across every release or Android refuses the update-install.
+  # ---------------------------------------------------------------------------------------------
+  android:
+    name: Build Android
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'microsoft'
+          java-version: '17'
+
+      - name: Install MAUI Android workload
+        run: dotnet workload install maui-android
+
+      - name: Decode signing keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "::error::Secret ANDROID_KEYSTORE_BASE64 is not set. Base64-encode your keystore \
+          (base64 -w0 my.keystore) and add it as a repo secret, plus ANDROID_KEYSTORE_PASSWORD / \
+          ANDROID_KEY_ALIAS / ANDROID_KEY_PASSWORD. The keystore must NEVER change between \
+          releases or Android will reject the update-install."
+            exit 1
+          fi
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+
+      - name: Publish signed APK
+        env:
+          # These map onto the signing hook in AdBlockApp.csproj (the ADBLOCKAPP_ANDROID_* MSBuild
+          # properties). Passing them means the build signs with the real CI keystore instead of
+          # the committed debug fallback.
+          ADBLOCKAPP_ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/release.keystore
+          ADBLOCKAPP_ANDROID_STOREPASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ADBLOCKAPP_ANDROID_KEYALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ADBLOCKAPP_ANDROID_KEYPASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          dotnet publish tools/AdBlockApp/AdBlockApp.csproj \
+            -f net10.0-android -c Release \
+            -p:ApplicationDisplayVersion=${{ needs.version.outputs.number }} \
+            -p:ApplicationVersion=${{ github.run_number }}
+
+      - name: Collect signed APK
+        run: |
+          # The signed release APK is the *-Signed.apk under the android publish output.
+          APK=$(find tools/AdBlockApp/bin/Release/net10.0-android -name "*-Signed.apk" | head -n1)
+          if [ -z "$APK" ]; then
+            echo "::error::No *-Signed.apk found — signing may have failed."
+            find tools/AdBlockApp/bin/Release/net10.0-android -name "*.apk" || true
+            exit 1
+          fi
+          DEST="MoviesMafia-${{ needs.version.outputs.tag }}.apk"
+          cp "$APK" "$DEST"
+          echo "Collected $APK -> $DEST"
+
+      - name: Upload Android artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: MoviesMafia-*.apk
+          retention-days: 1
+
+  # ---------------------------------------------------------------------------------------------
+  # RELEASE — gather both artifacts and publish/update the GitHub Release for this tag. The
+  # updater (AdBlockCore/UpdateChecker) reads releases/latest and picks the win .zip / .apk asset.
+  # ---------------------------------------------------------------------------------------------
+  release:
+    name: Publish GitHub Release
+    needs: [version, windows, android]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.version.outputs.tag }}
+          name: MoviesMafia ${{ needs.version.outputs.tag }}
+          generate_release_notes: true
+          files: |
+            dist/windows-zip/*
+            dist/android-apk/*

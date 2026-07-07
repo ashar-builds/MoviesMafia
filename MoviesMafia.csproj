@@ -11,6 +11,20 @@
 		<RootNamespace>MoviesMafia</RootNamespace>
 	</PropertyGroup>
 
+	<!--
+		The Web SDK implicitly globs every **/*.cs, **/*.razor and **/*.xaml under the project
+		directory. The standalone ad-block apps live under tools/ (AdBlockCore engine + AdBlockApp
+		MAUI shell, targeting net10.0-android / net10.0-windows) and must NOT be compiled into the
+		web app — they have their own solutions/build. Exclude the whole tree.
+	-->
+	<ItemGroup>
+		<Compile Remove="tools/**/*.cs" />
+		<Content Remove="tools/**/*" />
+		<None Remove="tools/**/*" />
+		<Page Remove="tools/**/*.xaml" />
+		<ApplicationDefinition Remove="tools/**/*.xaml" />
+	</ItemGroup>
+
 	<ItemGroup>
 		<PackageReference Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore" Version="10.0.0" />
 		<PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.0" />

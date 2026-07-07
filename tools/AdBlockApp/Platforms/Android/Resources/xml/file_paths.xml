@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<paths>
+    <!-- Downloaded update APKs land in the app's external files dir (FileSystem.CacheDirectory's
+         sibling) so FileProvider can hand a content:// URI to the system package installer —
+         installers can't read a file:// path in our private app-data dir. See
+         Platforms/Android/SettingsPage.Android.cs. -->
+    <external-files-path name="updates" path="updates/" />
+</paths>

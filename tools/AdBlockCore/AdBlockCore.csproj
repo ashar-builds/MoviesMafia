@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The portable ad-blocking engine — no WPF/WebView2/MAUI/Android types anywhere in this
+    project on purpose (see HANDOFF.md's cross-platform note). Both the legacy WPF PoC
+    (AdBlockShell) and the MAUI app (AdBlockApp) reference this project unmodified; each host
+    supplies its own platform glue (WebView2 hooks on Windows, WebViewClient/WebChromeClient
+    hooks on Android) that maps its native request/navigation types onto this library's
+    host-agnostic ResourceType/AbpRule/CosmeticEngine API.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>AdBlockCore</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Nager.PublicSuffix" Version="3.8.0" />
+  </ItemGroup>
+
+</Project>

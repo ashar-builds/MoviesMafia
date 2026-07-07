@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="AdBlockApp.Pages.BrowserPage"
+             Title="MoviesMafia"
+             Shell.NavBarIsVisible="False">
+
+    <!-- Full-bleed web view so the app reads as a native wrapper of the site, with no app
+         chrome. A single small, semi-transparent settings button floats over the bottom
+         corner — the ONLY app UI on this page, and the only way to reach ad-block settings /
+         the updater now that there's no nav bar or status bar to host those controls. -->
+    <Grid>
+
+        <WebView x:Name="Web" />
+
+        <Button x:Name="SettingsButton"
+                Text="⚙"
+                FontSize="18"
+                Clicked="OnSettingsClicked"
+                WidthRequest="44"
+                HeightRequest="44"
+                CornerRadius="22"
+                Padding="0"
+                BackgroundColor="#99000000"
+                TextColor="White"
+                HorizontalOptions="End"
+                VerticalOptions="End"
+                Margin="0,0,16,16" />
+
+    </Grid>
+
+</ContentPage>
