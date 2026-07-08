@@ -8,8 +8,10 @@
     <!-- Full-bleed web view so the app reads as a native wrapper of the site, with no app
          chrome. A single small, semi-transparent settings button floats over the bottom
          corner — the ONLY app UI on this page, and the only way to reach ad-block settings /
-         the updater now that there's no nav bar or status bar to host those controls. -->
-    <Grid>
+         the updater now that there's no nav bar or status bar to host those controls.
+         The button is draggable (PanGestureRecognizer, see code-behind) so it can be moved off
+         whatever the player puts under it; a tap still opens Settings. -->
+    <Grid x:Name="RootGrid">
 
         <WebView x:Name="Web" />
 
@@ -25,7 +27,11 @@
                 TextColor="White"
                 HorizontalOptions="End"
                 VerticalOptions="End"
-                Margin="0,0,16,16" />
+                Margin="0,0,16,16">
+            <Button.GestureRecognizers>
+                <PanGestureRecognizer PanUpdated="OnSettingsButtonPan" />
+            </Button.GestureRecognizers>
+        </Button>
 
     </Grid>
 
