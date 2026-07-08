@@ -22,6 +22,9 @@ public partial class FirstRunPage : ContentPage
         settings.FirstRunCompleted = true;
         settings.Save();
 
-        await Shell.Current.GoToAsync($"//{nameof(BrowserPage)}");
+        // Pop back to the BrowserPage this page was pushed on top of (see App.CreateWindow). ".."
+        // is relative navigation — the counterpart to the relative push there; absolute routing
+        // ("//BrowserPage") would crash the same way the old first-run navigation did on Android.
+        await Shell.Current.GoToAsync("..");
     }
 }

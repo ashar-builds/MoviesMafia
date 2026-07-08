@@ -116,7 +116,7 @@ documented fallback gap confirmed). Don't trust "it compiled" for any of the abo
 ```bash
 # Windows (uses win-x64 WebView2 target)
 dotnet build tools/AdBlockApp/AdBlockApp.csproj -f net10.0-windows10.0.19041.0
-tools/AdBlockApp/bin/Debug/net10.0-windows10.0.19041.0/win-x64/AdBlockApp.exe
+tools/AdBlockApp/bin/Debug/net10.0-windows10.0.19041.0/win-x64/MoviesMafia.exe
 
 # Android (requires Android SDK platform 36 + build-tools 36.0.0 + a JDK — see below if missing)
 dotnet build tools/AdBlockApp/AdBlockApp.csproj -f net10.0-android

@@ -31,7 +31,7 @@ public partial class SettingsPage
             return;
         }
 
-        var confirmed = await DisplayAlert("Update available",
+        var confirmed = await DisplayAlertAsync("Update available",
             $"MoviesMafia {release.TagName} is available. Download it now? You'll be asked to confirm the install afterward.",
             "Download", "Not now");
         if (!confirmed) return;
