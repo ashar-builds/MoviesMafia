@@ -51,16 +51,27 @@
 	</PropertyGroup>
 
 	<!--
-		Android Release: DISABLE trimming. The app serializes/deserializes with reflection-based
-		System.Text.Json (AppSettings load/save, CosmeticInjector's record → JSON). The default
-		Android Release link mode (SdkOnly) trims framework metadata those reflection paths need,
-		producing a crash that only manifests in the published APK, never in a Debug run — which is
-		precisely the "fresh install crashes on launch" class of bug. Turning the linker off trades
-		a larger APK (acceptable for a direct-download utility app) for removing that whole risk.
-		Revisit only if switching JSON to a source-generated context (trim-safe) to shrink the APK.
+		Android Release runtime hardening — two coupled settings, do NOT split them:
+
+		1. AndroidLinkMode=None — the app uses reflection-based System.Text.Json (AppSettings
+		   load/save, CosmeticInjector's record → JSON). The default Release linker (SdkOnly)
+		   trims BCL metadata those reflection paths need, crashing only in the published APK,
+		   never in Debug. Turning the linker off removes that whole class of bug (trades a larger
+		   APK, fine for a direct-download utility).
+
+		2. AndroidEnableMarshalMethods=false — REQUIRED whenever the linker is off. Marshal
+		   methods (default-on in .NET Release) are rewritten by the linker; with the linker
+		   disabled the native/managed class sizes disagree and Mono aborts at startup with
+		   "class-init.c ... klass->instance_size == instance_size not met" (a hard crash on the
+		   FIRST launch, before any app code runs). Marshal methods are only a startup-perf
+		   optimization, so disabling them is safe; this is the documented pairing for LinkMode=None.
+
+		Revisit both together only if moving JSON to a source-generated (trim-safe) context, which
+		would let the linker be re-enabled and marshal methods restored.
 	-->
 	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' AND '$(Configuration)' == 'Release'">
 		<AndroidLinkMode>None</AndroidLinkMode>
+		<AndroidEnableMarshalMethods>false</AndroidEnableMarshalMethods>
 	</PropertyGroup>
 
 	<!--
