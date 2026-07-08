@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace AdBlockCore;
 
@@ -38,7 +39,7 @@ public static class CosmeticInjector
             GlobalException: engine.GlobalExceptionSelectors,
             Allowlist: allowlistedHosts
         );
-        var json = JsonSerializer.Serialize(data);
+        var json = JsonSerializer.Serialize(data, CosmeticJsonContext.Default.PayloadData);
 
         // The whole thing runs synchronously in the frame's own JS context — before the
         // frame's HTML has been parsed, so `document.documentElement` already exists (an
@@ -113,7 +114,7 @@ public static class CosmeticInjector
         """;
     }
 
-    private sealed record PayloadData(
+    internal sealed record PayloadData(
         IReadOnlyCollection<string> Generic,
         IReadOnlyDictionary<string, IReadOnlyList<string>> GenericExcludedOn,
         IReadOnlyDictionary<string, IReadOnlyList<string>> DomainHide,
@@ -121,3 +122,12 @@ public static class CosmeticInjector
         IReadOnlyCollection<string> GlobalException,
         IReadOnlyCollection<string> Allowlist);
 }
+
+/// <summary>
+/// Source-generated (reflection-free) JSON metadata for the cosmetic payload — same rationale as
+/// <c>AppSettingsJsonContext</c>: keeps the Android Release linker ON by removing the reflection
+/// serialization the trimmer can't follow.
+/// </summary>
+[JsonSourceGenerationOptions(WriteIndented = false)]
+[JsonSerializable(typeof(CosmeticInjector.PayloadData))]
+internal sealed partial class CosmeticJsonContext : JsonSerializerContext;

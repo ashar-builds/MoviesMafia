@@ -15,7 +15,7 @@ public partial class SettingsPage
 {
     private partial async Task PromptInstallUpdateAsync(ReleaseInfo release)
     {
-        var confirmed = await DisplayAlert("Update available",
+        var confirmed = await DisplayAlertAsync("Update available",
             $"MoviesMafia {release.TagName} is available. Open the download page? " +
             "Extract the new version over your current install to update.",
             "Open download page", "Not now");

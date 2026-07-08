@@ -20,7 +20,14 @@ public partial class App : Application
 		var settings = AppSettings.Load(Path.Combine(Microsoft.Maui.Storage.FileSystem.AppDataDirectory, "settings.json"));
 		if (!settings.FirstRunCompleted)
 		{
-			window.Created += async (_, _) => await Shell.Current.GoToAsync($"//{nameof(Pages.FirstRunPage)}");
+			// RELATIVE route (no "//"): push FirstRunPage on top of the default BrowserPage.
+			// Absolute routing ("//FirstRunPage") to a Routing.RegisterRoute'd *global* route is
+			// rejected by MAUI's Android Shell backend ("Global routes currently cannot be the
+			// only page on the stack") and hard-crashes on the FIRST launch — WinUI's backend
+			// happened to tolerate it, so this only ever surfaced on Android. Pushing relatively
+			// keeps BrowserPage as the stack root (so it's not "the only page"), and lets it warm
+			// the filter cache behind the explainer; FirstRunPage pops back to it on Continue.
+			window.Created += async (_, _) => await Shell.Current.GoToAsync(nameof(Pages.FirstRunPage));
 		}
 
 		return window;

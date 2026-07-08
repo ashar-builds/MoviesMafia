@@ -1,7 +1,19 @@
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace AdBlockCore;
+
+/// <summary>
+/// Source-generated (reflection-free) JSON metadata for <see cref="AppSettings"/>. This is what
+/// lets the Android Release build keep the linker ON: reflection-based serialization forces
+/// <c>AndroidLinkMode=None</c> (huge APK, slow startup) because the trimmer can't see which BCL
+/// members the reflection paths need; a compile-time context has no such blind spot, so trimming
+/// is safe and the linker/marshal-method defaults stay in effect. See AdBlockApp.csproj.
+/// </summary>
+[JsonSourceGenerationOptions(WriteIndented = false)]
+[JsonSerializable(typeof(AppSettings))]
+internal sealed partial class AppSettingsJsonContext : JsonSerializerContext;
 
 /// <summary>
 /// Persisted user preferences: the master ad-block toggle and a per-site allowlist. Plain JSON
@@ -34,7 +46,7 @@ public sealed class AppSettings
         try
         {
             settings = File.Exists(path)
-                ? JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path)) ?? new AppSettings()
+                ? JsonSerializer.Deserialize(File.ReadAllText(path), AppSettingsJsonContext.Default.AppSettings) ?? new AppSettings()
                 : new AppSettings();
         }
         catch
@@ -50,7 +62,7 @@ public sealed class AppSettings
     {
         if (_path is null) return;
         Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
-        File.WriteAllText(_path, JsonSerializer.Serialize(this));
+        File.WriteAllText(_path, JsonSerializer.Serialize(this, AppSettingsJsonContext.Default.AppSettings));
     }
 
     /// <summary>True if <paramref name="host"/> is allowlisted directly or is a subdomain of an

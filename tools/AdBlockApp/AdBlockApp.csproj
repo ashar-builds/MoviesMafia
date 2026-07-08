@@ -27,8 +27,13 @@
 
 		<!-- Display name — the user-visible app name (window title, launcher/taskbar label).
 		     Intentionally "MoviesMafia": to the user this IS the MoviesMafia app, not a separate
-		     ad-blocker. (RootNamespace/AssemblyName stay AdBlockApp — internal only.) -->
+		     ad-blocker. -->
 		<ApplicationTitle>MoviesMafia</ApplicationTitle>
+
+		<!-- Output binary name. Without this the assembly (and therefore the Windows launcher)
+		     defaults to the project name, shipping a confusing "AdBlockApp.exe". The RootNamespace
+		     stays AdBlockApp (internal code identity); only the produced binary is branded. -->
+		<AssemblyName>MoviesMafia</AssemblyName>
 
 		<!-- App Identifier. Stable package id: Android refuses to update-install over a package
 		     whose id changed, so this must not drift once a build has shipped. -->
@@ -51,28 +56,19 @@
 	</PropertyGroup>
 
 	<!--
-		Android Release runtime hardening — two coupled settings, do NOT split them:
+		Android Release runtime: the framework defaults (SdkOnly linker + marshal methods ON) are
+		deliberately LEFT IN PLACE — this is the startup-performance path. The app's only
+		reflection-based JSON (AppSettings load/save, CosmeticInjector's payload) was moved to
+		source-generated, trim-safe JsonSerializerContexts (see AdBlockCore's AppSettingsJsonContext
+		/ CosmeticJsonContext), so the trimmer no longer strips metadata those paths need. That
+		removed the reason the linker was ever disabled — and with the linker back on, marshal
+		methods (a startup optimization the linker rewrites) are safe again too, so the earlier
+		AndroidLinkMode=None + AndroidEnableMarshalMethods=false pairing is gone: smaller APK,
+		faster cold start, and the marshal-method class-init crash class can't recur.
 
-		1. AndroidLinkMode=None — the app uses reflection-based System.Text.Json (AppSettings
-		   load/save, CosmeticInjector's record → JSON). The default Release linker (SdkOnly)
-		   trims BCL metadata those reflection paths need, crashing only in the published APK,
-		   never in Debug. Turning the linker off removes that whole class of bug (trades a larger
-		   APK, fine for a direct-download utility).
-
-		2. AndroidEnableMarshalMethods=false — REQUIRED whenever the linker is off. Marshal
-		   methods (default-on in .NET Release) are rewritten by the linker; with the linker
-		   disabled the native/managed class sizes disagree and Mono aborts at startup with
-		   "class-init.c ... klass->instance_size == instance_size not met" (a hard crash on the
-		   FIRST launch, before any app code runs). Marshal methods are only a startup-perf
-		   optimization, so disabling them is safe; this is the documented pairing for LinkMode=None.
-
-		Revisit both together only if moving JSON to a source-generated (trim-safe) context, which
-		would let the linker be re-enabled and marshal methods restored.
+		Only reintroduce LinkMode=None if a NEW reflection-serialization path is added without a
+		source-gen context — and prefer adding the context.
 	-->
-	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' AND '$(Configuration)' == 'Release'">
-		<AndroidLinkMode>None</AndroidLinkMode>
-		<AndroidEnableMarshalMethods>false</AndroidEnableMarshalMethods>
-	</PropertyGroup>
 
 	<!--
 		Windows Release publish settings (HANDOFF.md Task 4) — self-contained, unpackaged
@@ -88,11 +84,12 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<!-- App Icon -->
-		<MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#512BD4" />
+		<!-- App Icon — MoviesMafia brand red (#DC3545, from the site favicon). Color is the icon
+		     background MAUI composites the foreground "M" over. -->
+		<MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#DC3545" />
 
-		<!-- Splash Screen -->
-		<MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
+		<!-- Splash Screen — same brand red as the fill behind the white "M" glyph. -->
+		<MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#DC3545" BaseSize="128,128" />
 
 		<!-- Images -->
 		<MauiImage Include="Resources\Images\*" />
@@ -169,7 +166,7 @@
 	-->
 	<Target Name="SignWindowsPublishOutput" AfterTargets="Publish"
 	        Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows' AND '$(ADBLOCKAPP_WIN_CERT_PATH)' != ''">
-		<Exec Command="signtool sign /f &quot;$(ADBLOCKAPP_WIN_CERT_PATH)&quot; /p &quot;$(ADBLOCKAPP_WIN_CERT_PASSWORD)&quot; /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 &quot;$(PublishDir)AdBlockApp.exe&quot;" />
+		<Exec Command="signtool sign /f &quot;$(ADBLOCKAPP_WIN_CERT_PATH)&quot; /p &quot;$(ADBLOCKAPP_WIN_CERT_PASSWORD)&quot; /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 &quot;$(PublishDir)$(AssemblyName).exe&quot;" />
 	</Target>
 
 </Project>
