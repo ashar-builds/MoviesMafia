@@ -78,6 +78,41 @@ public partial class BrowserPage : ContentPage
     private async void OnSettingsClicked(object? sender, EventArgs e) =>
         await Shell.Current.GoToAsync(nameof(SettingsPage));
 
+    // Drag state for the floating settings button. TranslationX/Y are offsets from its anchored
+    // bottom-right position; both are <= 0 (dragging can only pull it left/up, into the page).
+    // _startX/_startY hold the translation at the moment the current pan began, because
+    // PanGestureRecognizer reports Total{X,Y} cumulatively from the gesture's start, not per-frame.
+    private double _dragStartX, _dragStartY;
+
+    /// <summary>Lets the user reposition the settings button by dragging it (a plain tap still
+    /// fires <see cref="OnSettingsClicked"/>). Kept in shared code — PanGestureRecognizer works on
+    /// both Windows and Android, so no platform partial is needed. The final position is clamped
+    /// to the page so the button can't be lost off an edge; it isn't persisted (resets to the
+    /// corner next launch), which is the simplest behavior that satisfies "move it out of the way".</summary>
+    private void OnSettingsButtonPan(object? sender, PanUpdatedEventArgs e)
+    {
+        switch (e.StatusType)
+        {
+            case GestureStatus.Started:
+                _dragStartX = SettingsButton.TranslationX;
+                _dragStartY = SettingsButton.TranslationY;
+                break;
+
+            case GestureStatus.Running:
+                // Anchored bottom-right, so leftward/upward travel is negative and bounded by how
+                // much page space sits to the left of / above the button's resting corner. The
+                // 16px terms mirror the button's Margin so it can't be dragged under a screen edge.
+                double maxLeft = -(RootGrid.Width - SettingsButton.Width - 32);
+                double maxUp = -(RootGrid.Height - SettingsButton.Height - 32);
+                SettingsButton.TranslationX = Clamp(_dragStartX + e.TotalX, maxLeft, 0);
+                SettingsButton.TranslationY = Clamp(_dragStartY + e.TotalY, maxUp, 0);
+                break;
+        }
+    }
+
+    private static double Clamp(double value, double min, double max) =>
+        value < min ? min : (value > max ? max : value);
+
     /// <summary>Called by the platform partial after it cancels a request that matched a network
     /// block rule. Kept as a live tally on the shared runtime (surfaced in Settings' filter
     /// status); the main page shows no counter — it's a chrome-less site wrapper.</summary>

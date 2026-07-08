@@ -34,7 +34,14 @@ public partial class BrowserPage
         // AdBlockWebViewClient's doc comment for why losing MAUI's Navigating/Navigated events
         // is an acceptable trade for this single fixed-navigation page.
         platformView.SetWebViewClient(new AdBlockWebViewClient(Runtime, _homeHost, OnRequestBlocked, OnPopupOrHijackBlocked));
-        platformView.SetWebChromeClient(new AdBlockWebChromeClient(OnPopupOrHijackBlocked));
+
+        // The chrome client needs the current Activity to host the HTML5-fullscreen custom view
+        // (OnShowCustomView adds it to the Activity's decor). Platform.CurrentActivity is MAUI's
+        // supported accessor for it; it's non-null here because ConfigureNativeWebViewAsync runs
+        // from the page's Loaded handler, well after the Activity exists.
+        var activity = Platform.CurrentActivity
+            ?? throw new InvalidOperationException("No current Activity for WebView fullscreen hosting.");
+        platformView.SetWebChromeClient(new AdBlockWebChromeClient(activity, OnPopupOrHijackBlocked));
 
         InjectCosmeticScriptIfSupported(platformView);
         Runtime.EnginesUpdated += () =>

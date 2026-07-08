@@ -81,6 +81,36 @@ public partial class BrowserPage
             if (host is "localhost" or "127.0.0.1")
                 ev.Action = CoreWebView2ServerCertificateErrorAction.AlwaysAllow;
         };
+
+        // 6) HTML5 video fullscreen (the provider's fullscreen button). WebView2 raises this
+        // whenever a fullscreen element enters/exits; ContainsFullScreenElement tells us which.
+        // WebView2 already resizes the fullscreen video to fill the control — our job is only to
+        // make the control fill the screen, i.e. borderless-maximize the app window on the way in
+        // and restore it on the way out. Without this the video "goes fullscreen" inside the
+        // normal windowed WebView, which looks like the button doing nothing.
+        core.ContainsFullScreenElementChanged += (_, _) =>
+            MainThread.BeginInvokeOnMainThread(() => ApplyWindowFullScreen(core.ContainsFullScreenElement));
+    }
+
+    // Remembers the pre-fullscreen window chrome so exiting restores exactly what the user had.
+    private bool _wasFullScreen;
+
+    private void ApplyWindowFullScreen(bool fullScreen)
+    {
+        if (fullScreen == _wasFullScreen) return;
+        _wasFullScreen = fullScreen;
+
+        // Reach the WinUI AppWindow behind this MAUI window and drive its presenter. FullScreen
+        // presenter is the documented WinUI API for borderless, taskbar-covering fullscreen —
+        // it hides the title bar and maximizes, and Overlapped restores the normal frame.
+        if (Window?.Handler?.PlatformView is not Microsoft.UI.Xaml.Window nativeWindow) return;
+        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(nativeWindow);
+        var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
+        var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId);
+
+        appWindow.SetPresenter(fullScreen
+            ? Microsoft.UI.Windowing.AppWindowPresenterKind.FullScreen
+            : Microsoft.UI.Windowing.AppWindowPresenterKind.Overlapped);
     }
 
     private async Task WireCosmeticInjectionAsync(CoreWebView2 core)
