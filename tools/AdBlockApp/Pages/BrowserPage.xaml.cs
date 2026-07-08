@@ -38,26 +38,41 @@ public partial class BrowserPage : ContentPage
     {
         Loaded -= OnPageLoaded;
 
-        await Runtime.InitializeAsync();
+        // Order matters, and the whole thing must be crash-proof (this is an async void event
+        // handler — an escaped exception here takes the process down, which is exactly what was
+        // crashing a fresh Android install and blanking Windows).
+        //
+        // 1) Kick off ad-block initialization WITHOUT awaiting it. On a fresh install with no
+        //    filter cache this downloads ~8 lists; blocking first paint on that (a) made the
+        //    site take many seconds to appear and (b) put a network-dependent await on the
+        //    startup critical path where any failure crashed the app. Settings is already loaded
+        //    synchronously in the runtime ctor, so the hooks below have what they need; the
+        //    engines populate in the background and EnginesUpdated wires cosmetics when ready.
+        _ = Runtime.InitializeAsync();
 
+        // 2) Wire the native WebView and navigate — guarded so a hook-up failure still shows the
+        //    site (unfiltered) instead of a blank screen. ConfigureNativeWebViewAsync must not
+        //    return until the native control is ready to accept a navigation (Windows creates
+        //    CoreWebView2 asynchronously; setting Source before that silently drops it).
         try
         {
-            // Must be fully awaited before setting Web.Source below: on Windows, the platform
-            // WebView2 control's CoreWebView2 isn't ready synchronously (it's created via
-            // EnsureCoreWebView2Async) — setting Source before that completes silently drops
-            // the navigation because MAUI's handler has nothing to hand it to yet. Every
-            // platform partial's implementation is responsible for not returning until its
-            // native WebView is actually ready to navigate.
             await ConfigureNativeWebViewAsync();
         }
         catch
         {
-            // The native hook-up failed — still navigate so the user sees the site (unfiltered)
-            // rather than a blank screen. There's no status bar to report the error to anymore;
-            // this is a wrapper, not a browser. (Ad-block wiring failing is rare and non-fatal.)
+            // Native ad-block wiring failed — fall through and still navigate. Better an
+            // unfiltered site than a blank window; there's no status bar to report to anyway.
         }
 
-        Web.Source = DefaultStartUrl;
+        try
+        {
+            Web.Source = DefaultStartUrl;
+        }
+        catch
+        {
+            // Extremely unlikely (Web is a live control by Loaded), but never let it escape the
+            // async void.
+        }
     }
 
     private async void OnSettingsClicked(object? sender, EventArgs e) =>
