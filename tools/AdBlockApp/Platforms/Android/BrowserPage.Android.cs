@@ -33,7 +33,7 @@ public partial class BrowserPage
         // Replace MAUI's default WebViewClient/WebChromeClient outright — see
         // AdBlockWebViewClient's doc comment for why losing MAUI's Navigating/Navigated events
         // is an acceptable trade for this single fixed-navigation page.
-        platformView.SetWebViewClient(new AdBlockWebViewClient(Runtime, _homeHost, OnRequestBlocked, OnPopupOrHijackBlocked));
+        platformView.SetWebViewClient(new AdBlockWebViewClient(Runtime, _homeHost, OnRequestBlocked, OnPopupOrHijackBlocked, OnPageFinishedLoading));
 
         // The chrome client needs the current Activity to host the HTML5-fullscreen custom view
         // (OnShowCustomView adds it to the Activity's decor). Platform.CurrentActivity is MAUI's
@@ -89,7 +89,7 @@ public partial class BrowserPage
             // guarantee. See this method's doc comment — this is a real, documented gap, not
             // a bug to silently "fix" by pretending it works.
             platformView.SetWebViewClient(new AdBlockWebViewClient(
-                Runtime, _homeHost, OnRequestBlocked, OnPopupOrHijackBlocked,
+                Runtime, _homeHost, OnRequestBlocked, OnPopupOrHijackBlocked, OnPageFinishedLoading,
                 fallbackCosmeticScript: () => CosmeticInjector.BuildScript(Runtime.Cosmetic!, Runtime.Settings.AllowlistedHosts)));
             return;
         }

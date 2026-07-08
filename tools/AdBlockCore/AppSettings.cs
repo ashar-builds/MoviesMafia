@@ -34,10 +34,6 @@ public sealed class AppSettings
     /// case where staying current matters most, but the user can turn it off from Settings.</summary>
     public bool AutoUpdateEnabled { get; set; } = true;
 
-    /// <summary>True once the first-run explainer screen has been shown and dismissed — set once
-    /// and never reset, so re-launching the app never re-shows it.</summary>
-    public bool FirstRunCompleted { get; set; }
-
     private string? _path;
 
     public static AppSettings Load(string path)

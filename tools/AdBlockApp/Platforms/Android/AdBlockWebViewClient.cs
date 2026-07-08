@@ -20,6 +20,7 @@ public sealed class AdBlockWebViewClient : WebViewClient
     private readonly string _homeHost;
     private readonly Action _onRequestBlocked;
     private readonly Action _onHijackBlocked;
+    private readonly Action _onPageFinished;
 
     /// <summary>Non-null ONLY when <c>WebViewFeature.DocumentStartScript</c> is unsupported on
     /// this device (see <c>BrowserPage.Android.cs</c>'s <c>InjectCosmeticScriptIfSupported</c>) —
@@ -31,13 +32,24 @@ public sealed class AdBlockWebViewClient : WebViewClient
 
     public AdBlockWebViewClient(
         AdBlockRuntime runtime, string homeHost, Action onRequestBlocked, Action onHijackBlocked,
-        Func<string>? fallbackCosmeticScript = null)
+        Action onPageFinished, Func<string>? fallbackCosmeticScript = null)
     {
         _runtime = runtime;
         _homeHost = homeHost;
         _onRequestBlocked = onRequestBlocked;
         _onHijackBlocked = onHijackBlocked;
+        _onPageFinished = onPageFinished;
         _fallbackCosmeticScript = fallbackCosmeticScript;
+    }
+
+    /// <summary>Main-frame navigation finished — the signal BrowserPage uses to drop its startup
+    /// loading overlay. Fires for every completed page load (including the fallback client), and
+    /// can fire more than once on redirects; the handler on BrowserPage is idempotent. OnPageFinished
+    /// is delivered on the UI thread per AOSP, but BrowserPage marshals anyway to be safe.</summary>
+    public override void OnPageFinished(AWebView? view, string? url)
+    {
+        base.OnPageFinished(view, url);
+        _onPageFinished();
     }
 
     /// <summary>Top-frame-only cosmetic fallback for devices without DOCUMENT_START_SCRIPT

@@ -9,11 +9,11 @@
 
     <!--
         Only BrowserPage gets a permanent ShellContent (the flyout/tab UI MAUI would otherwise
-        generate) — FirstRunPage and SettingsPage are registered as routable-only via
-        Routing.RegisterRoute in AppShell.xaml.cs and reached with Shell.Current.GoToAsync, so
-        they don't show up as extra tabs. All three are DI-constructed (each takes an
-        AdBlockRuntime), which Shell/RegisterRoute resolves automatically through the app's
-        IServiceProvider — see AppShell.xaml.cs.
+        generate) — SettingsPage is registered as routable-only via Routing.RegisterRoute in
+        AppShell.xaml.cs and reached with Shell.Current.GoToAsync, so it doesn't show up as an
+        extra tab. Both are DI-constructed (each takes an AdBlockRuntime), which
+        Shell/RegisterRoute resolves automatically through the app's IServiceProvider — see
+        AppShell.xaml.cs.
     -->
     <ShellContent
         Title="Watch"

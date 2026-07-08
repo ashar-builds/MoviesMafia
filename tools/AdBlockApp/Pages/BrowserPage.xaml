@@ -15,6 +15,22 @@
 
         <WebView x:Name="Web" />
 
+        <!-- Startup loading overlay: covers the WebView (brand red, matching the splash) with a
+             spinner until the site's first navigation completes, so the user never sees a white/
+             blank WebView while the page and filter lists come up. Hidden by OnPageFinishedLoading
+             (raised from each platform's native "navigation completed" hook). InputTransparent is
+             false so it also blocks taps on the page underneath while loading. -->
+        <Grid x:Name="LoadingOverlay" BackgroundColor="#DC3545">
+            <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Spacing="20">
+                <Label Text="MoviesMafia"
+                       TextColor="White"
+                       FontSize="28"
+                       FontAttributes="Bold"
+                       HorizontalOptions="Center" />
+                <ActivityIndicator IsRunning="True" Color="White" HorizontalOptions="Center" />
+            </VerticalStackLayout>
+        </Grid>
+
         <Button x:Name="SettingsButton"
                 Text="⚙"
                 FontSize="18"

@@ -90,6 +90,13 @@ public partial class BrowserPage
         // normal windowed WebView, which looks like the button doing nothing.
         core.ContainsFullScreenElementChanged += (_, _) =>
             MainThread.BeginInvokeOnMainThread(() => ApplyWindowFullScreen(core.ContainsFullScreenElement));
+
+        // 7) Hide the startup loading overlay once the site's first top-level navigation finishes.
+        // NavigationCompleted fires per top-level navigation (not sub-frames), so it's the right
+        // "page is up" signal; OnPageFinishedLoading is idempotent, so redirects firing it again
+        // are harmless. We hide regardless of IsSuccess — on a failed load the overlay must still
+        // come down so the user sees the WebView's own error page rather than a stuck spinner.
+        core.NavigationCompleted += (_, _) => OnPageFinishedLoading();
     }
 
     // Remembers the pre-fullscreen window chrome so exiting restores exactly what the user had.
