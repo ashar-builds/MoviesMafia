@@ -78,6 +78,18 @@ public partial class BrowserPage : ContentPage
     private async void OnSettingsClicked(object? sender, EventArgs e) =>
         await Shell.Current.GoToAsync(nameof(SettingsPage));
 
+    /// <summary>Called by each platform partial when the site's navigation finishes (Android's
+    /// <c>WebViewClient.OnPageFinished</c> / Windows' <c>CoreWebView2.NavigationCompleted</c>) —
+    /// MAUI's own <c>WebView.Navigated</c> doesn't fire because both platforms replace MAUI's
+    /// navigation delegate. Hides the startup loading overlay. Idempotent and thread-safe: the
+    /// Android callback arrives off the UI thread, and NavigationCompleted can fire more than once
+    /// (redirects), so we marshal to the UI thread and just no-op if already hidden.</summary>
+    protected void OnPageFinishedLoading() => MainThread.BeginInvokeOnMainThread(() =>
+    {
+        if (!LoadingOverlay.IsVisible) return;
+        LoadingOverlay.IsVisible = false;
+    });
+
     // Drag state for the floating settings button. TranslationX/Y are offsets from its anchored
     // bottom-right position; both are <= 0 (dragging can only pull it left/up, into the page).
     // _startX/_startY hold the translation at the moment the current pan began, because

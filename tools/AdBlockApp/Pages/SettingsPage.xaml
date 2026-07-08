@@ -5,6 +5,12 @@
              Title="Settings"
              Shell.NavBarIsVisible="True">
 
+    <!-- Explicit Close in the nav bar — the back arrow Shell draws is easy to miss on a full-bleed
+         app, so this gives an unambiguous way out of Settings. Navigates back to BrowserPage. -->
+    <ContentPage.ToolbarItems>
+        <ToolbarItem Text="Close" Clicked="OnCloseClicked" />
+    </ContentPage.ToolbarItems>
+
     <ScrollView>
         <VerticalStackLayout Padding="20" Spacing="24">
 

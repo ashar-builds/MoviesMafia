@@ -56,6 +56,13 @@ public partial class SettingsPage : ContentPage
             : $"{network.RuleCount:N0} network rules · {_runtime.Cosmetic?.GenericHideSelectors.Count ?? 0:N0} cosmetic selectors";
     }
 
+    /// <summary>Close/back — pops this page off the stack back to BrowserPage. SettingsPage is
+    /// reached via a relative <c>GoToAsync(nameof(SettingsPage))</c> push (see BrowserPage), so
+    /// <c>".."</c> is the matching relative pop; absolute routing would crash on Android the same
+    /// way the old first-run navigation did.</summary>
+    private async void OnCloseClicked(object? sender, EventArgs e) =>
+        await Shell.Current.GoToAsync("..");
+
     private void OnAdBlockToggled(object? sender, ToggledEventArgs e)
     {
         _runtime.Settings.AdBlockEnabled = e.Value;

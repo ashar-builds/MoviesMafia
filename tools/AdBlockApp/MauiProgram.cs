@@ -23,7 +23,6 @@ public static class MauiProgram
 		// comment for why this must be a singleton, not a per-page instance.
 		builder.Services.AddSingleton<AdBlockRuntime>();
 		builder.Services.AddSingleton<UpdateChecker>();
-		builder.Services.AddTransient<FirstRunPage>();
 		builder.Services.AddTransient<BrowserPage>();
 		builder.Services.AddTransient<SettingsPage>();
 
