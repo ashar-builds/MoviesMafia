@@ -49,41 +49,72 @@ public sealed class AdBlockRuntime
         // %LOCALAPPDATA%\AdBlockShell — resolves to app-private storage on both Windows and
         // Android with no platform-specific code needed here.
         _appDataDir = Microsoft.Maui.Storage.FileSystem.AppDataDirectory;
+
+        // Load settings SYNCHRONOUSLY here (tiny guarded file read) so Settings is never null.
+        // The platform WebView hooks read Settings.AdBlockEnabled/AllowlistedHosts the moment
+        // they're wired — which now happens BEFORE InitializeAsync's engine build completes (so
+        // the site can paint immediately). The engines (Network/Cosmetic) stay null until ready
+        // and every hook null-checks them, so early requests simply pass through unfiltered.
+        Settings = AppSettings.Load(Path.Combine(_appDataDir, "settings.json"));
     }
 
     private Task? _initializeTask;
 
-    /// <summary>Idempotent: safe to call from every page that needs the runtime ready (currently
-    /// just <see cref="AdBlockApp.Pages.BrowserPage"/>) without re-downloading/re-parsing filter
-    /// lists on a second call — later callers just await the same in-flight/completed task.</summary>
+    /// <summary>Idempotent: safe to call from every page that needs the runtime ready without
+    /// re-downloading/re-parsing filter lists on a second call — later callers just await the
+    /// same in-flight/completed task. Never throws: any failure (network, parse, disk) is caught
+    /// and logged to <see cref="StatusText"/>, leaving the app usable (site loads, just
+    /// unfiltered) rather than crashing — a fresh install with no cache must not be able to take
+    /// the whole app down on a flaky first download.</summary>
     public Task InitializeAsync() => _initializeTask ??= InitializeCoreAsync();
 
     private async Task InitializeCoreAsync()
     {
-        Settings = AppSettings.Load(Path.Combine(_appDataDir, "settings.json"));
-        _provider = new FilterListProvider(Path.Combine(_appDataDir, "filters"));
+        try
+        {
+            _provider = new FilterListProvider(Path.Combine(_appDataDir, "filters"));
 
-        var seeded = _provider.LoadCachedEnginesIfPresent();
-        if (seeded is not null)
-        {
-            (Network, Cosmetic) = (seeded.Network, seeded.Cosmetic);
-            SetStatus($"Ad-block active (cached) · {Network.RuleCount:N0} rules · updating filters…");
-            _ = RefreshInBackgroundAsync();
+            var seeded = _provider.LoadCachedEnginesIfPresent();
+            if (seeded is not null)
+            {
+                (Network, Cosmetic) = (seeded.Network, seeded.Cosmetic);
+                SetStatus($"Ad-block active (cached) · {Network.RuleCount:N0} rules · updating filters…");
+                EnginesUpdated?.Invoke();
+                _ = RefreshInBackgroundAsync();
+            }
+            else
+            {
+                // True first run: no cache to seed from, so we must download before filtering.
+                var built = await _provider.BuildEnginesAsync(SetStatus);
+                (Network, Cosmetic) = (built.Network, built.Cosmetic);
+                SetStatus($"Ad-block active · {Network.RuleCount:N0} rules");
+                // MUST fire so the WebView (already navigated) wires up cosmetic injection now
+                // that the engines finally exist — without this, a fresh install never applies
+                // cosmetic filtering until the next launch.
+                EnginesUpdated?.Invoke();
+            }
         }
-        else
+        catch (Exception ex)
         {
-            var built = await _provider.BuildEnginesAsync(SetStatus);
-            (Network, Cosmetic) = (built.Network, built.Cosmetic);
-            SetStatus($"Ad-block active · {Network.RuleCount:N0} rules");
+            SetStatus($"Ad-block unavailable ({ex.GetType().Name}) — site loads unfiltered.");
         }
     }
 
     private async Task RefreshInBackgroundAsync()
     {
-        var built = await _provider.BuildEnginesAsync(SetStatus);
-        (Network, Cosmetic) = (built.Network, built.Cosmetic);
-        SetStatus($"Ad-block active · {Network.RuleCount:N0} rules");
-        EnginesUpdated?.Invoke();
+        try
+        {
+            var built = await _provider.BuildEnginesAsync(SetStatus);
+            (Network, Cosmetic) = (built.Network, built.Cosmetic);
+            SetStatus($"Ad-block active · {Network.RuleCount:N0} rules");
+            EnginesUpdated?.Invoke();
+        }
+        catch (Exception ex)
+        {
+            // Background refresh failed — keep serving the already-loaded cached engines; the
+            // cached seed is still filtering, so this is a non-event beyond the status text.
+            SetStatus($"Ad-block active (cached) · filter refresh failed ({ex.GetType().Name}).");
+        }
     }
 
     public Task ForceRefreshAsync() => RefreshInBackgroundAsync();

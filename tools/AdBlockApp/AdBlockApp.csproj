@@ -51,6 +51,19 @@
 	</PropertyGroup>
 
 	<!--
+		Android Release: DISABLE trimming. The app serializes/deserializes with reflection-based
+		System.Text.Json (AppSettings load/save, CosmeticInjector's record → JSON). The default
+		Android Release link mode (SdkOnly) trims framework metadata those reflection paths need,
+		producing a crash that only manifests in the published APK, never in a Debug run — which is
+		precisely the "fresh install crashes on launch" class of bug. Turning the linker off trades
+		a larger APK (acceptable for a direct-download utility app) for removing that whole risk.
+		Revisit only if switching JSON to a source-generated context (trim-safe) to shrink the APK.
+	-->
+	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' AND '$(Configuration)' == 'Release'">
+		<AndroidLinkMode>None</AndroidLinkMode>
+	</PropertyGroup>
+
+	<!--
 		Windows Release publish settings (HANDOFF.md Task 4) — self-contained, unpackaged
 		(WindowsPackageType=None above), single win-x64 folder so a downloaded release needs no
 		.NET or WindowsAppSDK preinstalled. See README's exact `dotnet publish` command.
